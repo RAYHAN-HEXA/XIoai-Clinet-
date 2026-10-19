@@ -101,16 +101,32 @@ model Business {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String    @id @default(cuid())
+  email        String    @unique
   passwordHash String
   name         String
-  role         Role     @default(VIEWER)
+  role         Role      @default(VIEWER)
   businessId   String
-  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  createdAt    DateTime @default(now())
+  business     Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  sessions     Session[]
 
   @@index([businessId])
+}
+
+/// Server-side session registry — enables real revocation (logout, forced invalidation).
+/// The JWT carries `jti` = Session.id; requireAuth rejects revoked/expired sessions.
+model Session {
+  id        String    @id // jti
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+  ip        String?
+  userAgent String?
+
+  @@index([userId])
 }
 
 model DataSource {
@@ -257,7 +273,8 @@ model Approval {
   @@index([status])
 }
 
-// Append-only: no update/delete path exists in code (integrity chain lands in Phase 7).
+// Append-only: no update/delete path exists in code. Tamper-evident hash chain:
+// hash = sha256(prevHash ‖ canonical(row)) — computed by the audit writer.
 model AuditLog {
   id         String   @id @default(cuid())
   businessId String
@@ -268,6 +285,8 @@ model AuditLog {
   metadata   Json?
   ip         String?
   createdAt  DateTime @default(now())
+  prevHash   String?
+  hash       String?
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 

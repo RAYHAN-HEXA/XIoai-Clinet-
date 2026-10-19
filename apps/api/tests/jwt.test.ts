@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { signSession, verifySession } from '../src/lib/jwt';
 
-const session = { userId: 'user-1', businessId: 'biz-1', role: 'OWNER' as const };
+const session = { userId: 'user-1', businessId: 'biz-1', role: 'OWNER' as const, jti: 'sess-1' };
 
 describe('session JWT', () => {
   it('round-trips a valid session', () => {

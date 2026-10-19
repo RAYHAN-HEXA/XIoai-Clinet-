@@ -1,11 +1,13 @@
 import { Router } from 'express';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
-import { signSession, verifySession } from '../lib/jwt';
+import { SESSION_TTL_SECONDS, signSession, verifySession } from '../lib/jwt';
 import { SESSION_COOKIE, sessionCookieOptions } from '../lib/cookies';
 import { hashPassword, verifyPassword } from '../lib/password';
 import { requireAuth } from '../middleware/auth';
 import { loginLimiter } from '../middleware/rate-limit';
+import { issueCsrfToken } from '../middleware/csrf';
 import { writeAudit } from '../audit/audit';
 import { asyncHandler } from '../lib/async';
 
@@ -13,7 +15,12 @@ export const authRouter = Router();
 
 const registerSchema = z.object({
   email: z.string().email().max(254).toLowerCase(),
-  password: z.string().min(8, 'Password must be at least 8 characters').max(128),
+  // policy: ≥8 chars, at least one letter and one digit (Phase-7 hardening)
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters')
+    .max(128)
+    .regex(/^(?=.*[A-Za-z])(?=.*\d).+$/, 'Password must contain at least one letter and one number'),
   name: z.string().trim().min(1).max(80),
   businessName: z.string().trim().min(1).max(120),
   businessNameZh: z.string().trim().max(120).optional()
@@ -28,6 +35,50 @@ function toSafeUser<T extends { passwordHash: string }>(user: T): Omit<T, 'passw
   const { passwordHash: _passwordHash, ...safe } = user;
   return safe;
 }
+
+/** Create a Session row and sign a JWT bound to it (jti = Session.id). */
+async function signSessionWithNewJti(
+  userId: string,
+  businessId: string,
+  role: 'OWNER' | 'ACCOUNTANT' | 'VIEWER'
+): Promise<string> {
+  const jti = randomUUID();
+  await prisma.session.create({
+    data: { id: jti, userId, expiresAt: new Date(Date.now() + SESSION_TTL_SECONDS * 1000) }
+  });
+  return signSession({ userId, businessId, role, jti });
+}
+
+/** In-memory per-account lockout (5 fails → 15 min). Instance-local; Redis store
+ *  needed for multi-instance deployments (residual risk R5). */
+const FAILS_TO_LOCK = 5;
+const LOCK_MS = 15 * 60 * 1000;
+const failCounts = new Map<string, { count: number; lockedUntil: number }>();
+
+function isLocked(email: string): boolean {
+  const rec = failCounts.get(email);
+  return !!rec && rec.lockedUntil > Date.now();
+}
+function recordFail(email: string): void {
+  const rec = failCounts.get(email) ?? { count: 0, lockedUntil: 0 };
+  rec.count += 1;
+  if (rec.count >= FAILS_TO_LOCK) {
+    rec.lockedUntil = Date.now() + LOCK_MS;
+    rec.count = 0;
+  }
+  failCounts.set(email, rec);
+}
+function clearFails(email: string): void {
+  failCounts.delete(email);
+}
+
+authRouter.get(
+  '/csrf',
+  asyncHandler(async (req, res) => {
+    const token = issueCsrfToken(req, res);
+    res.json({ token });
+  })
+);
 
 authRouter.post(
   '/register',
@@ -57,11 +108,9 @@ authRouter.post(
       return { user, business };
     });
 
-    res.cookie(
-      SESSION_COOKIE,
-      signSession({ userId: user.id, businessId: business.id, role: user.role }),
-      sessionCookieOptions()
-    );
+    const token = await signSessionWithNewJti(user.id, business.id, user.role);
+    res.cookie(SESSION_COOKIE, token, sessionCookieOptions());
+    issueCsrfToken(req, res);
 
     writeAudit({
       businessId: business.id,
@@ -76,11 +125,17 @@ authRouter.post(
   })
 );
 
+/** Sign a session token bound to a freshly created Session row. */
 authRouter.post(
   '/login',
   loginLimiter,
   asyncHandler(async (req, res) => {
     const body = loginSchema.parse(req.body);
+
+    if (isLocked(body.email)) {
+      res.status(429).json({ error: 'RATE_LIMITED', message: 'Account temporarily locked. Try again later.' });
+      return;
+    }
 
     const user = await prisma.user.findUnique({
       where: { email: body.email },
@@ -89,9 +144,8 @@ authRouter.post(
     const passwordOk = user ? await verifyPassword(body.password, user.passwordHash) : false;
 
     if (!user || !passwordOk) {
-      // Audit only when the account exists (no businessId for unknown emails);
-      // never log the attempted email — PII.
       if (user) {
+        recordFail(body.email);
         writeAudit({
           businessId: user.businessId,
           userId: user.id,
@@ -105,11 +159,10 @@ authRouter.post(
       return;
     }
 
-    res.cookie(
-      SESSION_COOKIE,
-      signSession({ userId: user.id, businessId: user.businessId, role: user.role }),
-      sessionCookieOptions()
-    );
+    clearFails(body.email);
+    const token = await signSessionWithNewJti(user.id, user.businessId, user.role);
+    res.cookie(SESSION_COOKIE, token, sessionCookieOptions());
+    issueCsrfToken(req, res);
 
     writeAudit({
       businessId: user.businessId,
@@ -125,28 +178,34 @@ authRouter.post(
   })
 );
 
-authRouter.post('/logout', (req, res) => {
-  const token = req.cookies?.[SESSION_COOKIE];
-  const session = token ? verifySession(token) : null;
+authRouter.post(
+  '/logout',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const token = req.cookies?.[SESSION_COOKIE];
+    const session = token ? verifySession(token) : null;
 
-  // strip maxAge — express's clearCookie needs its past-dated Expires to survive,
-  // otherwise the "deleted" cookie is re-issued with a fresh 7-day lifetime.
-  const { maxAge: _maxAge, ...clearOptions } = sessionCookieOptions();
-  res.clearCookie(SESSION_COOKIE, clearOptions);
+    // server-side revocation — the JWT alone would still verify until expiry
+    if (session) {
+      await prisma.session.updateMany({
+        where: { id: session.jti, userId: session.userId, revokedAt: null },
+        data: { revokedAt: new Date() }
+      });
+      writeAudit({
+        businessId: session.businessId,
+        userId: session.userId,
+        action: 'LOGOUT',
+        entityType: 'USER',
+        entityId: session.userId,
+        ip: req.ip
+      });
+    }
 
-  if (session) {
-    writeAudit({
-      businessId: session.businessId,
-      userId: session.userId,
-      action: 'LOGOUT',
-      entityType: 'USER',
-      entityId: session.userId,
-      ip: req.ip
-    });
-  }
-
-  res.status(204).send();
-});
+    const { maxAge: _maxAge, ...clearOptions } = sessionCookieOptions();
+    res.clearCookie(SESSION_COOKIE, clearOptions);
+    res.status(204).send();
+  })
+);
 
 authRouter.get('/me', requireAuth, (req, res) => {
   const user = req.user;

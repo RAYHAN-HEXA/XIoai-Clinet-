@@ -6,8 +6,19 @@ import pinoHttp from 'pino-http';
 import { env } from './config/env';
 import { logger } from './lib/logger';
 import { generalLimiter } from './middleware/rate-limit';
+import { csrfProtection } from './middleware/csrf';
 import { healthRouter } from './routes/health';
 import { authRouter } from './routes/auth';
+import { profitRouter } from './routes/profit';
+import { cashRouter } from './routes/cash';
+import { financingRouter } from './routes/financing';
+import { evidenceRouter } from './routes/evidence';
+import { briefRouter } from './routes/brief';
+import { recommendationsRouter, approvalsRouter } from './routes/recommendations';
+import { auditRouter } from './routes/audit';
+import { sourcesRouter } from './routes/sources';
+import { importsRouter } from './routes/imports';
+import { assistantRouter } from './routes/assistant';
 import { errorHandler, notFoundHandler } from './middleware/error';
 
 export function createApp(): express.Express {
@@ -32,13 +43,25 @@ export function createApp(): express.Express {
     pinoHttp({
       logger,
       autoLogging: { ignore: (req) => req.url === '/health' },
-      redact: { paths: ['req.headers.cookie', 'req.headers.authorization'], censor: '[REDACTED]' }
+      redact: { paths: ['req.headers.cookie', 'req.headers.authorization', 'req.body.password', 'req.body.email'], censor: '[REDACTED]' }
     })
   );
   app.use(generalLimiter);
 
   app.use(healthRouter);
   app.use('/api/auth', authRouter);
+  app.use(csrfProtection);
+  app.use('/api/profit', profitRouter);
+  app.use('/api/cash', cashRouter);
+  app.use('/api/financing', financingRouter);
+  app.use('/api/evidence', evidenceRouter);
+  app.use('/api/brief', briefRouter);
+  app.use('/api/recommendations', recommendationsRouter);
+  app.use('/api/approvals', approvalsRouter);
+  app.use('/api/audit', auditRouter);
+  app.use('/api/sources', sourcesRouter);
+  app.use('/api/imports', importsRouter);
+  app.use('/api/assistant', assistantRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
