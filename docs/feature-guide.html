@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>XiaoCai AI — Feature Guide (Frontend + Backend)</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; color: #1a2332; font-size: 12px; line-height: 1.5; margin: 0; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  h2 { font-size: 17px; color: #0b1f3a; border-bottom: 2.5px solid #10b981; padding-bottom: 4px; margin: 26px 0 10px; page-break-after: avoid; }
+  h3 { font-size: 13.5px; color: #0b1f3a; margin: 16px 0 6px; page-break-after: avoid; }
+  p { margin: 6px 0; }
+  .cover { background: #0b1f3a; color: #fff; border-radius: 10px; padding: 34px 30px; margin-bottom: 18px; }
+  .cover .zh { color: #34d399; }
+  .cover .tag { color: #cbd5e1; font-size: 13px; margin-top: 8px; }
+  .cover .meta { color: #94a3b8; font-size: 11px; margin-top: 14px; }
+  .badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 8px; border-radius: 999px; vertical-align: middle; }
+  .done { background: #d1fae5; color: #065f46; }
+  .plan { background: #fef3c7; color: #92400e; }
+  .sec { background: #e0e7ff; color: #3730a3; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 12px; page-break-inside: auto; }
+  th { background: #0b1f3a; color: #fff; text-align: left; padding: 5px 8px; font-size: 11px; }
+  td { border: 1px solid #d7dee8; padding: 4px 8px; font-size: 11px; vertical-align: top; }
+  tr:nth-child(even) td { background: #f4f7fb; }
+  code, .mono { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 10.5px; background: #eef2f7; padding: 1px 4px; border-radius: 3px; }
+  pre { background: #0b1f3a; color: #d7e3f4; padding: 10px 12px; border-radius: 8px; font-size: 10px; line-height: 1.45; overflow: hidden; page-break-inside: avoid; }
+  ul { margin: 4px 0 10px 18px; padding: 0; }
+  li { margin: 2.5px 0; }
+  .grid2 { display: flex; gap: 12px; }
+  .grid2 > div { flex: 1; }
+  .card { border: 1px solid #d7dee8; border-radius: 8px; padding: 10px 12px; margin: 8px 0; page-break-inside: avoid; }
+  .card h4 { margin: 0 0 4px; font-size: 12px; color: #0b1f3a; }
+  .warn { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; padding: 8px 12px; margin: 8px 0; font-size: 11px; page-break-inside: avoid; }
+  .ok { color: #059669; font-weight: 600; }
+  .pagebreak { page-break-before: always; }
+  .small { font-size: 10.5px; color: #4b5563; }
+  .kpis { display: flex; gap: 8px; margin: 10px 0; }
+  .kpi { flex: 1; background: #f0fdf9; border: 1px solid #a7f3d0; border-radius: 8px; padding: 8px 10px; font-size: 11px; }
+  .kpi b { display: block; color: #065f46; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>XiaoCai AI <span class="zh">小财 AI</span> — Feature Guide</h1>
+  <div style="font-size:14px;color:#e2e8f0;">The Business Profit &amp; Survival Agent · SME Finance Copilot</div>
+  <div class="tag">"See what's really left — before it's too late." · <b>Data in. Math decides. AI explains.</b></div>
+  <div class="meta">Shenzhen FinTechathon 2026 · International Track · Topic E &nbsp;|&nbsp; Document generated 2026-10-19 &nbsp;|&nbsp; Status: <b style="color:#34d399">Phase 1 of 8 complete</b></div>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><b>13</b>DB models (money in fen)</div>
+  <div class="kpi"><b>4+1</b>API endpoints live</div>
+  <div class="kpi"><b>5</b>web routes live + 9 nav stubs</div>
+  <div class="kpi"><b>2</b>languages (EN / 中文)</div>
+  <div class="kpi"><b>7/7</b>unit tests green</div>
+  <div class="kpi"><b>6</b>commits, clean history</div>
+</div>
+
+<h2>1 · Product in one page</h2>
+<p>Multi-channel sellers in China (Douyin, Taobao/Tmall, Xiaohongshu, Pinduoduo) see record sales but an empty bank account: fees, refunds, ads, influencer commissions, delivery and D15–D28 settlement delays hide the real cash position. It is a <b>visibility problem, not a sales problem</b>. Anchor example: ¥100,000 revenue → product 25k + ads 25k + commission 20k + delivery 12k + refunds 8k + platform fees 5k → <b>real profit ¥5,000 (5%)</b>.</p>
+<table>
+  <tr><th>Owner question</th><th>Engine</th><th>Delivers</th><th>Status</th></tr>
+  <tr><td>"How much do I really keep?"</td><td>True Profit Detective</td><td>Profit per product / campaign / channel + cost waterfall</td><td><span class="badge plan">Phase 2–6</span></td></tr>
+  <tr><td>"Why did profit drop?"</td><td>Driver Explainer</td><td>Period-over-period variance decomposed, ranked, with evidence</td><td><span class="badge plan">Phase 2–6</span></td></tr>
+  <tr><td>"Will I run short of cash?"</td><td>Survival Simulator</td><td>30-day cash curve, what-if sliders, shortage day, alerts</td><td><span class="badge plan">Phase 2–6</span></td></tr>
+</table>
+<p><b>Non-negotiable architecture rule:</b> authorised data → deterministic engine (the <i>only</i> source of numbers) → AI layer that parses questions &amp; writes explanations (post-checked: any number not in the engine JSON is discarded → template fallback) → owner approves every financial action. The app must fully work with the LLM turned off.</p>
+
+<h2>2 · Architecture &amp; monorepo layout</h2>
+<pre>xiaocai-ai/  (npm workspaces · Node ≥ 20 · strict TypeScript, no "any")
+├─ apps/web        Next.js 14 App Router · Tailwind · shadcn-style UI · next-intl (EN/中文)
+├─ apps/api        Express 4 · Zod · Prisma 5.22 · JWT httpOnly cookie · pino · helmet
+│   ├─ prisma/     schema.prisma · migrations/0_init · (seed.ts in Phase 3)
+│   ├─ src/routes/ health · auth            (Phase 4+: profit, cash, financing, …)
+│   ├─ src/lib/    prisma(443 auto-driver) · jwt · password · cookies · logger · async
+│   ├─ src/middleware/ auth(requireAuth/requireRole) · rate-limit · error
+│   ├─ src/audit/  writeAudit — append-only, fire-and-forget, no PII
+│   └─ scripts/    db-check · db-migrate-443 · embedded-pg · neon-probe · e2e-audit-and-cleanup
+├─ packages/engine pure TS — no I/O, no LLM, no clock. Money = integer fen. (Phase 2 fills it)
+└─ docs/           this guide</pre>
+<div class="warn">🌐 <b>Network-proof DB path:</b> this ISP silently drops Postgres payloads on port 5432 (TCP fake-connects). When <code>DATABASE_URL</code> host is <code>*.neon.tech</code>, the API automatically connects via the Neon WebSocket driver over <b>HTTPS 443</b> (<code>@prisma/adapter-neon</code>); other hosts use plain TCP. Migration CLI still needs TCP → use <code>npx tsx apps/api/scripts/db-migrate-443.ts</code> on this network. Verified live: migrate + register/login against real Neon.</div>
+
+<h2 class="pagebreak">3 · Database — 13 models <span class="badge done">DONE</span></h2>
+<p>All money columns are <b>Int storing fen</b> (¥1 = 100); formatted only at display. Spec'd compound indexes: <code>Order(businessId, orderedAt)</code>, <code>AdSpend(businessId, date)</code>, <code>SupplierInvoice(businessId, dueDate)</code>.</p>
+<table>
+  <tr><th>Model</th><th>Key fields</th><th>Notes</th></tr>
+  <tr><td>Business</td><td>name, nameZh, currency=CNY, openingCash, <b>isDemo</b></td><td>demo data flag (Phase 3 seed)</td></tr>
+  <tr><td>User</td><td>email UQ, passwordHash, name, <b>role: OWNER/ACCOUNTANT/VIEWER</b></td><td>cascade on business delete</td></tr>
+  <tr><td>DataSource</td><td>type: CHANNEL/ADS/LOGISTICS/INVOICES/BANK · status: GRANTED/REVOKED · permission: READ_ONLY/READ_WRITE · grantedAt/revokedAt</td><td>revoked ⇒ hidden from engines (Phase 3 helper)</td></tr>
+  <tr><td>Product</td><td>sku (UQ per business), name, unitCost</td><td>—</td></tr>
+  <tr><td>Order</td><td>channel+externalId (UQ), orderedAt, gross, platformFee, commission, deliveryCost, refundAmount, status, settlementDate, settledAmount</td><td>core profit input</td></tr>
+  <tr><td>AdSpend</td><td>channel, campaign, date, spend, attributedRevenue</td><td>ROAS driver</td></tr>
+  <tr><td>SupplierInvoice</td><td>supplierName, amount, dueDate, status: PAID/DUE/OVERDUE/<b>MISSING_DOC</b>, documentRef</td><td>missing docs disclosed, never hidden</td></tr>
+  <tr><td>Settlement</td><td>channel, expectedDate, amount, PENDING/RECEIVED</td><td>D15–D28 delays</td></tr>
+  <tr><td>Scenario</td><td>name, params Json, result Json</td><td>saved what-ifs (Phase 4)</td></tr>
+  <tr><td>Recommendation</td><td>type, title, <b>evidence Json · impact Json · action Json</b></td><td>Evidence·Impact·Action shape, always</td></tr>
+  <tr><td>Approval</td><td>1:1 recommendation, PENDING/APPROVED/REJECTED, decidedById/At, note</td><td>approve ≠ execute — record only</td></tr>
+  <tr><td>AuditLog</td><td>action, entityType/Id, metadata, ip — <b>insert-only</b></td><td>hash chain lands Phase 7</td></tr>
+  <tr><td>ImportJob</td><td>kind, filename, rowsTotal/Ok/Failed, errors Json, status</td><td>CSV pipeline (Phase 3)</td></tr>
+</table>
+
+<h2>4 · Backend features</h2>
+<h3>4.1 Live endpoints <span class="badge done">DONE &amp; E2E-TESTED</span></h3>
+<table>
+  <tr><th>Endpoint</th><th>Behaviour</th><th>Verified</th></tr>
+  <tr><td><code>GET /health</code></td><td>runs SELECT 1 → 200 <code>{status:"ok",db:true}</code> / 503 <code>degraded</code> when DB unreachable</td><td class="ok">✓ live</td></tr>
+  <tr><td><code>POST /api/auth/register</code></td><td>Zod-validated → creates <b>Business + OWNER user in one transaction</b> → sets httpOnly cookie → audit REGISTER. 409 duplicate email · 400 validation</td><td class="ok">✓ 201</td></tr>
+  <tr><td><code>POST /api/auth/login</code></td><td>rate-limited (10 fails / 15 min, successes don't count) → generic 401 (no user enumeration) → audit LOGIN / LOGIN_FAILED (no emails logged)</td><td class="ok">✓ 200/401/429</td></tr>
+  <tr><td><code>POST /api/auth/logout</code></td><td>clears cookie with proper past-dated Expires (bug found &amp; fixed in E2E) → audit LOGOUT</td><td class="ok">✓ 204</td></tr>
+  <tr><td><code>GET /api/auth/me</code></td><td>requireAuth → re-fetches user from DB (role changes take effect instantly) → returns user + business, <b>passwordHash never leaves the server</b></td><td class="ok">✓ 200/401</td></tr>
+</table>
+<h3>4.2 Security implemented <span class="badge done">DONE</span></h3>
+<ul>
+  <li>bcrypt (10 rounds) hashing · JWT HS256, 7-day expiry in <b>httpOnly + SameSite=Lax + Secure-in-prod</b> cookie</li>
+  <li><code>requireAuth</code> / <code>requireRole(...)</code> middleware (role guard ready for Phase 4 endpoints)</li>
+  <li>helmet (CSP, HSTS, nosniff, frameguard…), strict CORS with credentials (WEB_ORIGIN), 1 MB JSON body cap</li>
+  <li>Two rate limiters: global 300/15 min · login 10 fails/15 min (express-rate-limit v7)</li>
+  <li>Central error handler: Zod→400 VALIDATION · Prisma P2002→409 · everything else→500 <code>{error:"INTERNAL"}</code> with <b>no stack leakage</b>; unknown routes → JSON 404</li>
+  <li>Append-only AuditLog on REGISTER / LOGIN / LOGIN_FAILED / LOGOUT with IP; cookies/authorization headers redacted in all logs</li>
+</ul>
+<h3>4.3 Planned backend work</h3>
+<table>
+  <tr><th>Phase</th><th>Feature</th><th>Details</th></tr>
+  <tr><td><span class="badge plan">2</span></td><td>Deterministic engine</td><td>trueProfit (reproduces ¥100k→¥5k) · profitDrivers · cashForecast (Day-12 shortage) · applyScenario · financingMatcher · buildEvidenceTree · dailyBriefData — pure functions, 40+ Vitest tests</td></tr>
+  <tr><td><span class="badge plan">3</span></td><td>Seed + CSV import</td><td>Ms. Li sandbox (GMV ¥180k, settled ¥142k, supplier ¥90k, 600 orders) · POST /api/imports/:kind with multer+papaparse, header mapping, row-level errors, ImportJob · DataSources grant/revoke → <code>getAuthorisedData()</code> becomes the only engine data path</td></tr>
+  <tr><td><span class="badge plan">4</span></td><td>Engine REST API</td><td>/api/profit/summary|by-product|by-campaign|by-channel|drivers · /api/cash/forecast|scenario|alerts · /api/financing/options · /api/evidence/:metric/:level · /api/brief/daily · /api/recommendations · /api/approvals/:id/decision (OWNER only) · /api/audit(+export.csv) · DATA_ACCESS audit on every financial read · supertest integration tests · swagger /docs</td></tr>
+  <tr><td><span class="badge plan">5</span></td><td>AI layer (explain-only)</td><td>LlmProvider interface (Claude / Noop fallback) · parseWhatIf (Zod, clamp −80..+200, EN+中文) · explain() with numbers-must-come-from-engine post-check · template explanations · prompt-injection guard (CSV cells never reach the LLM)</td></tr>
+  <tr><td><span class="badge sec">7</span></td><td>Hardening</td><td>CSRF double-submit token · account lockout · password policy · audit hash chain (prevHash+hash) · buyer-ID hashing (no PII) · npm audit + GitHub Actions CI · docs/ (SECURITY_SELF_ASSESSMENT, DATA_FLOW, RISK_REGISTER, PRIVACY_NOTES)</td></tr>
+  <tr><td><span class="badge sec">8</span></td><td>Ship</td><td>Playwright e2e ×2 · Vercel + Render/Railway + Neon deploy · README · /submission pack · DEMO_SCRIPT.md</td></tr>
+</table>
+
+<h2 class="pagebreak">5 · Frontend features</h2>
+<h3>5.1 Live routes <span class="badge done">DONE</span></h3>
+<table>
+  <tr><th>Route</th><th>What's there</th></tr>
+  <tr><td><code>/</code></td><td>Landing hero — navy band, tagline, Register/Log-in CTAs, phase badge</td></tr>
+  <tr><td><code>/register</code></td><td>Name, business name (EN + 中文 optional), email, password (min 8) → auto-login → dashboard</td></tr>
+  <tr><td><code>/login</code></td><td>Email + password; friendly 401 copy; links both ways with register</td></tr>
+  <tr><td><code>/dashboard</code></td><td>Header row with <b>live API-status chip</b> (green/red/gray, fetches /health) · 4 KPI placeholder cards (Revenue, Real Profit, Cash Today, Days-to-Shortage) marked "Lands in Phase 6"</td></tr>
+</table>
+<h3>5.2 App shell &amp; design system <span class="badge done">DONE</span></h3>
+<ul>
+  <li><b>Navy + emerald + warm-amber tokens</b> (red reserved for shortage only) via CSS variables + Tailwind config; shadcn-style primitives: Button (6 variants), Input, Label, Card set</li>
+  <li><b>Sidebar</b> with all 10 destinations: Dashboard ✅ + True Profit, Why Profit Dropped, Survival Simulator, Financing, Daily Brief, Approvals, Data Sources, Audit Log, Security (amber <i>Soon</i> badges; active-state highlight)</li>
+  <li><b>Header</b>: EN/中文 switcher (cookie-based, <code>router.refresh()</code>, aria-pressed) + Logout button</li>
+  <li><b>Full internationalisation</b> via next-intl without URL prefixes — <code>src/i18n/request.ts</code> reads the <code>xc_locale</code> cookie server-side; messages in <code>src/messages/en.json</code> + <code>zh.json</code>; every string already translated, including auth errors</li>
+  <li><b>Route guard</b> <code>src/middleware.ts</code>: no session cookie → /dashboard redirects to /login (with <code>?next=</code>); logged-in visits to /login|/register → /dashboard (presence check; real verification stays in requireAuth)</li>
+  <li>API client <code>lib/api.ts</code>: JSON wrapper, credentials:include, typed ApiError; <code>NEXT_PUBLIC_API_URL</code> with localhost:4000 fallback</li>
+</ul>
+<h3>5.3 Planned screens (Phase 6)</h3>
+<table>
+  <tr><th>Screen</th><th>Key UI</th></tr>
+  <tr><td>Dashboard (full)</td><td>4 real KPIs · "Record sales. Empty bank account." GMV-vs-settled-vs-supplier chart · top-3 Evidence·Impact·Action insight cards · alert banner</td></tr>
+  <tr><td>True Profit</td><td>Waterfall chart (revenue→costs→profit) · tabs by product/campaign/channel · sortable table, margin chips</td></tr>
+  <tr><td>Why Profit Dropped</td><td>Period selector · ranked driver bars · click → drill-down drawer</td></tr>
+  <tr><td>Survival Simulator</td><td>Base-vs-stressed cash curve · 4 what-if sliders (debounced live recompute) · red shortage marker · save scenario · chat "If sales drop 20%…" → Day-12 answer + 3 option cards → "Send for my approval"</td></tr>
+  <tr><td>Financing</td><td>4-option table (Cost/Speed/Best-when) · top pick highlighted · disclaimer: qualitative only, owner approves</td></tr>
+  <tr><td>Tap-any-number</td><td>Reusable <code>&lt;EvidenceNumber&gt;</code>: every ¥ clickable → 3-level drawer (headline → breakdown → raw order/statement) · amber MISSING_DOC badge "disclosed, not hidden"</td></tr>
+  <tr><td>Daily Brief</td><td>老板每日经营简报 &lt;3 min · 紧急付款/成本上升/逾期发票/待审批/缺失单据 · copy + print</td></tr>
+  <tr><td>Approvals</td><td>Pending list, approve/reject with note, history · banner "XiaoCai never pays or messages anyone on its own"</td></tr>
+  <tr><td>Audit Log / Security</td><td>Filterable table + CSV export · 4 pillars + known-risks R1–R5</td></tr>
+</table>
+
+<h2>6 · DevOps, tooling &amp; run book <span class="badge done">DONE</span></h2>
+<table>
+  <tr><th>Need</th><th>Command</th></tr>
+  <tr><td>Install everything</td><td><code>npm install</code></td></tr>
+  <tr><td>Run API / Web</td><td><code>npm run dev:api</code> (:4000) · <code>npm run dev:web</code> (:3000)</td></tr>
+  <tr><td>Quality gates</td><td><code>npm run lint</code> · <code>npm run typecheck</code> · <code>npm test</code> · <code>npm run build</code></td></tr>
+  <tr><td>Migrate (normal network)</td><td><code>npm run db:migrate</code> (prisma migrate dev)</td></tr>
+  <tr><td>Migrate on 5432-blocked network</td><td><code>npx tsx apps/api/scripts/db-migrate-443.ts</code></td></tr>
+  <tr><td>Local DB without Neon</td><td><code>npx tsx apps/api/scripts/embedded-pg.ts</code> → postgres://postgres:postgres@localhost:5433/xiaocai</td></tr>
+  <tr><td>Connection diagnostics</td><td><code>npx tsx apps/api/scripts/db-check.ts</code> · <code>node apps/api/scripts/neon-probe.js &lt;host&gt;</code></td></tr>
+  <tr><td>Browse data</td><td><code>npm run db:studio</code></td></tr>
+</table>
+<p class="small">Env: DATABASE_URL (Neon, in gitignored apps/api/.env only) · JWT_SECRET ≥32 chars · WEB_ORIGIN · PORT · NEXT_PUBLIC_API_URL. Demo login created: demo@xiaocai.ai / Demo1234! (OWNER, "Li's Livestream Store 李女士直播店").</p>
+
+<h2 class="pagebreak">7 · Improvement checklist (work through top-down)</h2>
+<h3>Quick wins you can do today <span class="badge done">no new phases</span></h3>
+<ul>
+  <li>□ Mobile sidebar — currently <code>hidden md:flex</code>; add a hamburger drawer (responsive down to 360 px is a Phase-6 requirement)</li>
+  <li>□ Register page: live password-strength hint + show confirm-password field</li>
+  <li>□ Login page: pre-fill <code>?next=</code> redirect target after success (param already sent by middleware)</li>
+  <li>□ Dashboard: auto-refresh the API chip every 30 s + show DB-latency from /health</li>
+  <li>□ Add favicon + PWA manifest + <code>next/font</code> (system stack is fine but Inter would sharpen the fintech look)</li>
+  <li>□ Add a "system status" footer line on dashboard: driver in use (443/TCP), DB latency, version</li>
+</ul>
+<h3>Phase 2 — engine (next)</h3>
+<ul>
+  <li>□ trueProfit reproduces the ¥100k→¥5k anchor in tests · edge cases: zero revenue, refunds &gt; revenue, empty arrays, negative balances</li>
+  <li>□ cashForecast hits Day-12 shortage on the stressed demo inputs (sales −20%, supplier +10%)</li>
+  <li>□ financingMatcher stays qualitative — no invented interest rates</li>
+  <li>□ 100% of deck-slide numbers (slides 2/3/4/7) covered by unit tests</li>
+</ul>
+<h3>Phase 3–4 — data &amp; API</h3>
+<ul>
+  <li>□ Seed tuned to deck numbers, <code>isDemo=true</code>, "Illustrative" labels everywhere</li>
+  <li>□ <code>getAuthorisedData(businessId)</code> as the ONLY raw-table path for engines; revoked sources disappear from every number</li>
+  <li>□ CSV import: header mapping + preview + per-row errors + ImportJob + audit; sample templates downloadable</li>
+  <li>□ Every financial read writes a DATA_ACCESS audit row · role tests (VIEWER can't approve, ACCOUNTANT can't revoke)</li>
+</ul>
+<h3>Phase 5 — AI guardrails</h3>
+<ul>
+  <li>□ Test that proves a fabricated LLM number gets discarded (the guard actually fires)</li>
+  <li>□ Chinese + English what-if parsing ("如果销售下降20%…") · confidence clamp −80..+200 · clarifying-question path</li>
+</ul>
+<h3>Phase 6 — UX bar</h3>
+<ul>
+  <li>□ Every ¥ becomes an <code>&lt;EvidenceNumber&gt;</code> — Level 1→2→3 drawer, raw order refs, MISSING_DOC amber badge</li>
+  <li>□ Loading skeletons + empty states + error boundaries on all screens · keyboard/contrast a11y pass</li>
+  <li>□ "Try the Ms. Li demo" auto-login button on landing</li>
+</ul>
+<h3>Phase 7 — security gaps to close (known, by design, tracked)</h3>
+<ul>
+  <li>□ CSRF double-submit token (SameSite=Lax is the current baseline)</li>
+  <li>□ Account lockout + stronger password policy (min-8 today)</li>
+  <li>□ Server-side session revocation (logout clears the cookie; a stolen token is valid ≤7d until then)</li>
+  <li>□ AuditLog integrity hash chain + immutability trigger in DB</li>
+  <li>□ Email enumeration on register (409 reveals existence) — decide policy</li>
+  <li>□ Login rate limit is per-instance memory → Redis store if API scales horizontally</li>
+</ul>
+<h3>Phase 8 — submission</h3>
+<ul>
+  <li>□ Playwright: login → simulator → "Day 12" → approve → audit shows event · CSV upload → profit updates</li>
+  <li>□ Deploy web/api/DB, run migrate deploy + seed server-side · DEMO_SCRIPT.md (8 beats) · /submission pack · verify no secrets in git history</li>
+</ul>
+
+<div class="card">
+  <h4>Verification status of everything claimed above</h4>
+  <p class="small">Lint ✓ (3 workspaces) · typecheck ✓ (strict, no any) · 7/7 Vitest ✓ · next build ✓ (5 routes + middleware) · tsc build ✓ · auth E2E on real Neon ✓ (register 201 / me 200 / logout 204 / login 200 / wrong-password 401 / duplicate 409 / validation 400 / rate-limit 429 / audit rows verified in DB) · embedded-pg E2E ✓ · Neon over 443 ✓ (migrate + full auth flow) · git history: zero .env commits (checked programmatically).</p>
+</div>
+
+</body>
+</html>
