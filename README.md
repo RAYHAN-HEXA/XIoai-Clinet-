@@ -35,8 +35,14 @@ npm install
 # 2. configure the API env — paste YOUR rotated Neon URL into apps/api/.env
 cp apps/api/.env.example apps/api/.env
 
-# 3. create the schema (first time; uses prisma migrate dev)
+# 3. create the schema (first time)
 npm run db:migrate
+#    └─ on a network that blocks port 5432 (some ISPs/venue WiFi), migrate
+#       over HTTPS 443 instead:  npx tsx apps/api/scripts/db-migrate-443.ts
+#       (the API itself always uses 443 for *.neon.tech hosts — automatic)
+#    └─ no Neon access at all? run a local throwaway DB instead:
+#       npx tsx apps/api/scripts/embedded-pg.ts  (then point DATABASE_URL at
+#       postgres://postgres:postgres@localhost:5433/xiaocai)
 
 # 4. run the API        → http://localhost:4000/health
 npm run dev:api

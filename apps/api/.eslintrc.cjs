@@ -11,5 +11,12 @@ module.exports = {
       { argsIgnorePattern: '^_', varsIgnorePattern: '^_', ignoreRestSiblings: true }
     ]
   },
-  ignorePatterns: ['dist', 'coverage', 'node_modules', '.env']
+  ignorePatterns: ['dist', 'coverage', 'node_modules', '.env'],
+  overrides: [
+    {
+      // plain-node dev/debug scripts keep CommonJS require
+      files: ['scripts/**/*.js'],
+      rules: { '@typescript-eslint/no-var-requires': 'off' }
+    }
+  ]
 };

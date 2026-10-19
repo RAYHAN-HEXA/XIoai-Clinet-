@@ -2,7 +2,8 @@
 // CONVENTION: all money columns are Int and store FEN (¥1 = 100). Format at display time only.
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {

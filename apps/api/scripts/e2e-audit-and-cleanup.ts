@@ -2,9 +2,7 @@
  * One-off E2E helper: dumps the audit trail of the test business, then deletes it
  * (cascades to users + audit rows). Runs against DATABASE_URL from the environment.
  */
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../src/lib/prisma';
 
 async function main(): Promise<void> {
   const business = await prisma.business.findFirst({

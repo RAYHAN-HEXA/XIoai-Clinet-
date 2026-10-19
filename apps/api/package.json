@@ -19,6 +19,8 @@
     "schema": "prisma/schema.prisma"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^0.10.4",
+    "@prisma/adapter-neon": "^5.22.0",
     "@prisma/client": "^5.22.0",
     "@xiaocai/engine": "*",
     "bcryptjs": "^2.4.3",
