@@ -129,7 +129,10 @@ authRouter.post('/logout', (req, res) => {
   const token = req.cookies?.[SESSION_COOKIE];
   const session = token ? verifySession(token) : null;
 
-  res.clearCookie(SESSION_COOKIE, sessionCookieOptions());
+  // strip maxAge — express's clearCookie needs its past-dated Expires to survive,
+  // otherwise the "deleted" cookie is re-issued with a fresh 7-day lifetime.
+  const { maxAge: _maxAge, ...clearOptions } = sessionCookieOptions();
+  res.clearCookie(SESSION_COOKIE, clearOptions);
 
   if (session) {
     writeAudit({
