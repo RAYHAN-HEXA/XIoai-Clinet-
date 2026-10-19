@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* XiaoCai palette: deep navy + emerald + warm amber. Red is reserved for cash shortage. */
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 216 46% 13%;
+    --card: 0 0% 100%;
+    --card-foreground: 216 46% 13%;
+    --primary: 160 84% 39%; /* emerald 500 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 214 32% 94%;
+    --secondary-foreground: 216 46% 13%;
+    --muted: 214 32% 94%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 38 92% 50%; /* warm amber 500 */
+    --accent-foreground: 26 83% 14%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 88%;
+    --input: 214 32% 88%;
+    --ring: 160 84% 39%;
+    --sidebar: 217 62% 12%; /* deep navy */
+    --sidebar-foreground: 210 36% 96%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}

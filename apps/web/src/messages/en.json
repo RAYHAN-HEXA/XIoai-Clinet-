@@ -1,0 +1,53 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "profit": "True Profit",
+    "drivers": "Why Profit Dropped",
+    "simulator": "Survival Simulator",
+    "financing": "Financing",
+    "brief": "Daily Brief",
+    "approvals": "Approvals",
+    "sources": "Data Sources",
+    "audit": "Audit Log",
+    "security": "Security",
+    "soon": "Soon",
+    "logout": "Log out"
+  },
+  "landing": {
+    "title": "Record sales. Empty bank account.",
+    "subtitle": "XiaoCai AI shows multi-channel sellers what's really left after fees, refunds, ads, commissions and settlement delays — before it's too late.",
+    "ctaRegister": "Register your business",
+    "ctaLogin": "Log in",
+    "phase": "MVP in active build · Phase 1 of 8 · Shenzhen FinTechathon 2026"
+  },
+  "auth": {
+    "loginTitle": "Log in to XiaoCai AI",
+    "loginSubtitle": "Welcome back. Your numbers are waiting.",
+    "registerTitle": "Register your business",
+    "registerSubtitle": "Creates your business workspace with you as OWNER.",
+    "email": "Email",
+    "password": "Password",
+    "name": "Your name",
+    "businessName": "Business name",
+    "businessNameZh": "Business name (中文, optional)",
+    "submitLogin": "Log in",
+    "submitRegister": "Create account",
+    "toRegister": "No account yet? Register",
+    "toLogin": "Already registered? Log in",
+    "working": "Working…",
+    "invalidCredentials": "Invalid email or password.",
+    "genericError": "Something went wrong. Please try again."
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Phase 1 shell is live — the three engines and full screens land in Phases 2–6.",
+    "apiOnline": "API online",
+    "apiOffline": "API unreachable",
+    "apiChecking": "Checking API…",
+    "kpiRevenue": "Revenue",
+    "kpiRealProfit": "Real Profit",
+    "kpiCashToday": "Cash Today",
+    "kpiShortage": "Days to Shortage",
+    "phaseNote": "Lands in Phase 6"
+  }
+}

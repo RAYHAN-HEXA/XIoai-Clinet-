@@ -1,0 +1,53 @@
+{
+  "nav": {
+    "dashboard": "仪表盘",
+    "profit": "真实利润",
+    "drivers": "利润为何下滑",
+    "simulator": "生存模拟器",
+    "financing": "融资匹配",
+    "brief": "每日简报",
+    "approvals": "审批中心",
+    "sources": "数据源与导入",
+    "audit": "审计日志",
+    "security": "安全与合规",
+    "soon": "即将上线",
+    "logout": "退出登录"
+  },
+  "landing": {
+    "title": "生意火爆，账户空空。",
+    "subtitle": "小财 AI 帮多渠道卖家看清费用、退款、广告、佣金与账期背后的真实结余——趁还来得及。",
+    "ctaRegister": "注册企业账户",
+    "ctaLogin": "登录",
+    "phase": "MVP 建设中 · 第 1 阶段（共 8 阶段）· 2026 深圳国际金融科技大赛"
+  },
+  "auth": {
+    "loginTitle": "登录小财 AI",
+    "loginSubtitle": "欢迎回来，你的数字正在等你。",
+    "registerTitle": "注册企业账户",
+    "registerSubtitle": "创建企业工作区，你将成为 OWNER（所有者）。",
+    "email": "邮箱",
+    "password": "密码",
+    "name": "您的姓名",
+    "businessName": "企业名称",
+    "businessNameZh": "企业名称（中文，可选）",
+    "submitLogin": "登录",
+    "submitRegister": "创建账户",
+    "toRegister": "还没有账户？去注册",
+    "toLogin": "已有账户？去登录",
+    "working": "处理中…",
+    "invalidCredentials": "邮箱或密码不正确。",
+    "genericError": "出错了，请稍后重试。"
+  },
+  "dashboard": {
+    "title": "仪表盘",
+    "subtitle": "第 1 阶段骨架已就绪——三大引擎与完整界面将在第 2–6 阶段陆续上线。",
+    "apiOnline": "API 在线",
+    "apiOffline": "API 无法连接",
+    "apiChecking": "正在检查 API…",
+    "kpiRevenue": "营收",
+    "kpiRealProfit": "真实利润",
+    "kpiCashToday": "今日现金",
+    "kpiShortage": "距现金短缺（天）",
+    "phaseNote": "第 6 阶段上线"
+  }
+}
