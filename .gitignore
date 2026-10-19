@@ -1,0 +1,24 @@
+# dependencies
+node_modules/
+
+# env & secrets — never commit
+.env
+.env.*
+!.env.example
+
+# builds
+dist/
+build/
+.next/
+out/
+
+# tests & coverage
+coverage/
+
+# logs & OS
+*.log
+.DS_Store
+
+# misc
+.turbo/
+.vercel
