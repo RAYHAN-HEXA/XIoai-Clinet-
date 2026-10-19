@@ -1,0 +1,292 @@
+// XiaoCai AI — Prisma schema.
+// CONVENTION: all money columns are Int and store FEN (¥1 = 100). Format at display time only.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  OWNER
+  ACCOUNTANT
+  VIEWER
+}
+
+enum DataSourceType {
+  CHANNEL
+  ADS
+  LOGISTICS
+  INVOICES
+  BANK
+}
+
+enum DataSourceStatus {
+  GRANTED
+  REVOKED
+}
+
+enum PermissionTier {
+  READ_ONLY
+  READ_WRITE
+}
+
+enum OrderStatus {
+  PENDING
+  COMPLETED
+  REFUNDED
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  PAID
+  DUE
+  OVERDUE
+  MISSING_DOC
+}
+
+enum SettlementStatus {
+  PENDING
+  RECEIVED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ImportKind {
+  ORDERS
+  SETTLEMENTS
+  ADS
+  INVOICES
+}
+
+enum ImportStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+// ── Models ───────────────────────────────────────────────────────────────────
+
+model Business {
+  id          String   @id @default(cuid())
+  name        String
+  nameZh      String?
+  currency    String   @default("CNY")
+  openingCash Int      @default(0) // fen
+  isDemo      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  users            User[]
+  dataSources      DataSource[]
+  products         Product[]
+  orders           Order[]
+  adSpends         AdSpend[]
+  supplierInvoices SupplierInvoice[]
+  settlements      Settlement[]
+  scenarios        Scenario[]
+  recommendations  Recommendation[]
+  auditLogs        AuditLog[]
+  importJobs       ImportJob[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role     @default(VIEWER)
+  businessId   String
+  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+
+  @@index([businessId])
+}
+
+model DataSource {
+  id         String           @id @default(cuid())
+  businessId String
+  type       DataSourceType
+  name       String
+  platform   String?
+  status     DataSourceStatus @default(GRANTED)
+  permission PermissionTier   @default(READ_ONLY)
+  grantedAt  DateTime         @default(now())
+  revokedAt  DateTime?
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  orders   Order[]
+  adSpends AdSpend[]
+
+  @@index([businessId, status])
+}
+
+model Product {
+  id         String @id @default(cuid())
+  businessId String
+  sku        String
+  name       String
+  unitCost   Int // fen
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  orders   Order[]
+
+  @@unique([businessId, sku])
+}
+
+model Order {
+  id             String      @id @default(cuid())
+  businessId     String
+  sourceId       String?
+  channel        String
+  externalId     String
+  productId      String?
+  orderedAt      DateTime
+  grossAmount    Int // fen
+  platformFee    Int         @default(0)
+  commission     Int         @default(0) // influencer commission
+  deliveryCost   Int         @default(0)
+  refundAmount   Int         @default(0)
+  status         OrderStatus @default(COMPLETED)
+  settlementDate DateTime?
+  settledAmount  Int? // fen
+
+  business Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  source   DataSource?  @relation(fields: [sourceId], references: [id])
+  product  Product?     @relation(fields: [productId], references: [id])
+
+  @@unique([businessId, channel, externalId])
+  @@index([businessId, orderedAt])
+  @@index([businessId, status])
+}
+
+model AdSpend {
+  id                String   @id @default(cuid())
+  businessId        String
+  sourceId          String?
+  channel           String
+  campaign          String
+  date              DateTime @db.Date
+  spend             Int // fen
+  attributedRevenue Int      @default(0) // fen
+
+  business Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  source   DataSource? @relation(fields: [sourceId], references: [id])
+
+  @@index([businessId, date])
+}
+
+model SupplierInvoice {
+  id           String        @id @default(cuid())
+  businessId   String
+  supplierName String
+  amount       Int // fen
+  dueDate      DateTime      @db.Date
+  status       InvoiceStatus @default(DUE)
+  documentRef  String?
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, dueDate])
+  @@index([businessId, status])
+}
+
+model Settlement {
+  id           String           @id @default(cuid())
+  businessId   String
+  channel      String
+  expectedDate DateTime         @db.Date
+  amount       Int // fen
+  status       SettlementStatus @default(PENDING)
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, expectedDate])
+}
+
+model Scenario {
+  id         String   @id @default(cuid())
+  businessId String
+  name       String
+  params     Json
+  result     Json
+  createdAt  DateTime @default(now())
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
+}
+
+model Recommendation {
+  id         String   @id @default(cuid())
+  businessId String
+  type       String
+  title      String
+  evidence   Json // what supports this
+  impact     Json // what changes if applied
+  action     Json // the concrete step the owner can approve
+  createdAt  DateTime @default(now())
+
+  business Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  approval Approval?
+
+  @@index([businessId, createdAt])
+}
+
+model Approval {
+  id               String         @id @default(cuid())
+  recommendationId String         @unique
+  status           ApprovalStatus @default(PENDING)
+  decidedById      String?
+  decidedAt        DateTime?
+  note             String         @default("")
+
+  recommendation Recommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+// Append-only: no update/delete path exists in code (integrity chain lands in Phase 7).
+model AuditLog {
+  id         String   @id @default(cuid())
+  businessId String
+  userId     String?
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
+  @@index([businessId, action])
+}
+
+model ImportJob {
+  id         String       @id @default(cuid())
+  businessId String
+  kind       ImportKind
+  filename   String
+  rowsTotal  Int          @default(0)
+  rowsOk     Int          @default(0)
+  rowsFailed Int          @default(0)
+  errors     Json?
+  status     ImportStatus @default(PENDING)
+  createdAt  DateTime     @default(now())
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
+}
