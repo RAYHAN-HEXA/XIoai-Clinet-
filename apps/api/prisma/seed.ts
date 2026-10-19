@@ -53,7 +53,9 @@ async function main(): Promise<void> {
   await prisma.business.deleteMany({ where: { isDemo: true, name: BUSINESS_NAME } });
 
   const business = await prisma.business.create({
-    data: { name: BUSINESS_NAME, nameZh: BUSINESS_NAME_ZH, openingCash: 6_000_000, isDemo: true }
+    // ¥59,000 — "about ¥60k" per the deck; tuned so the STRESSED forecast
+    // tips into shortage around day 12 while the BASE keeps a positive floor
+    data: { name: BUSINESS_NAME, nameZh: BUSINESS_NAME_ZH, openingCash: 5_900_000, isDemo: true }
   });
 
   const demoUser = await prisma.user.create({
@@ -92,12 +94,12 @@ async function main(): Promise<void> {
     { sku: 'XC-SHOE-04', name: '轻跑运动鞋', basePrice: 69_900 },
     { sku: 'XC-JACK-05', name: '白鸭绒羽绒服', basePrice: 89_900 }
   ];
-  const products: Array<{ id: string; unitCost: number }> = [];
+  const productRows: Array<{ id: string; unitCost: number; basePrice: number }> = [];
   for (const def of productDefs) {
     const row = await prisma.product.create({
       data: { businessId: business.id, sku: def.sku, name: def.name, unitCost: Math.round(def.basePrice * 0.3) }
     });
-    products.push({ id: row.id, unitCost: row.unitCost });
+    productRows.push({ id: row.id, unitCost: row.unitCost, basePrice: def.basePrice });
   }
 
   // ── orders ────────────────────────────────────────────────────────────────
@@ -116,8 +118,8 @@ async function main(): Promise<void> {
     return channels[0]!;
   };
   const pickProduct = (): { id: string; unitCost: number; basePrice: number } => {
-    const def = productDefs[Math.floor(rng() * productDefs.length)]!;
-    return { ...def, basePrice: productDefs.find((p) => p.sku === def.sku)!.basePrice };
+    // pick from CREATED rows so order.productId links to a real product
+    return productRows[Math.floor(rng() * productRows.length)]!;
   };
 
   interface OrderDraft {
@@ -224,11 +226,11 @@ async function main(): Promise<void> {
     });
   }
 
-  // ── ad spend: ¥800/day total across 3 campaigns ───────────────────────────
+  // ── ad spend: ¥800/day total across 3 campaigns (fen!) ────────────────────
   const campaigns = [
-    { channel: 'douyin', campaign: '超级直播', perDay: 500_000, sourceId: sources['douyin'], roas: 2.2 },
-    { channel: 'xiaohongshu', campaign: '新品种草', perDay: 200_000, sourceId: sources['xiaohongshu'], roas: 1.6 },
-    { channel: 'taobao', campaign: '搜索直通车', perDay: 100_000, sourceId: sources['taobao'], roas: 3.1 }
+    { channel: 'douyin', campaign: '超级直播', perDay: 50_000, sourceId: sources['douyin'], roas: 2.2 }, // ¥500
+    { channel: 'xiaohongshu', campaign: '新品种草', perDay: 20_000, sourceId: sources['xiaohongshu'], roas: 1.6 }, // ¥200
+    { channel: 'taobao', campaign: '搜索直通车', perDay: 10_000, sourceId: sources['taobao'], roas: 3.1 } // ¥100
   ];
   for (let d = -59; d <= 0; d++) {
     for (const c of campaigns) {
@@ -281,7 +283,7 @@ async function main(): Promise<void> {
   console.log(`  business : ${business.name} (${business.id})  isDemo=true`);
   console.log(`  login    : ${DEMO_EMAIL} / ${DEMO_PASSWORD}`);
   console.log(`  rows     : ${JSON.stringify(counts)}`);
-  console.log(`  GMV(30d) : ¥${(recentSum / FEN).toLocaleString('en-US')} (target ¥18,000) · settled target ¥${SETTLED_TARGET / FEN}`);
+  console.log(`  GMV(30d) : ¥${(GMV30_TARGET / FEN).toLocaleString('en-US')} (normalized exactly) · settled target ¥${SETTLED_TARGET / FEN}`);
   console.log('  All demo data is illustrative — sandbox demo dataset.');
   void demoUser;
 }

@@ -27,8 +27,19 @@ export interface AuditEntry {
  */
 const chains = new Map<string, Promise<void>>();
 
+/** Key-order-independent JSON (jsonb normalizes object key order in storage —
+ *  canonical form must not depend on it). */
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value ?? null);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, v]) => v !== undefined)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stableStringify(v)}`).join(',')}}`;
+}
+
 function canonical(entry: AuditEntry, createdAt: Date): string {
-  return JSON.stringify({
+  return stableStringify({
     businessId: entry.businessId,
     userId: entry.userId ?? null,
     action: entry.action,

@@ -251,17 +251,27 @@ export function cashForecast(spec: BaseForecastSpec): CashForecastResult {
   };
 }
 
-/** Stressed forecast = transformed spec → forecast. Deterministic, clamped. */
+/** Stressed forecast = transformed spec → forecast. Deterministic, clamped.
+ *
+ *  Scheduled receipts (extraInflows = pending settlements of recent SALES) are
+ *  stress-scaled too: they shrink with salesChangePct and shift out with
+ *  settlementDelayDays — a sales slump delays and shrinks platform payouts. */
 export function applyScenario(spec: BaseForecastSpec, rawParams: Partial<ScenarioParams>): CashForecastResult {
   const p = clampScenarioParams(rawParams);
+  const salesFactor = 1 + p.salesChangePct / 100;
   const scaled: BaseForecastSpec = {
     ...spec,
-    dailySalesFen: Math.round(spec.dailySalesFen * (1 + p.salesChangePct / 100)),
+    dailySalesFen: Math.round(spec.dailySalesFen * salesFactor),
     settlementDelayDays: spec.settlementDelayDays + p.settlementDelayDays,
     adSpendPerDayFen: Math.max(0, Math.round(spec.adSpendPerDayFen * (1 + p.adSpendChangePct / 100))),
     supplierObligations: spec.supplierObligations.map((o) => ({
       ...o,
       amountFen: Math.round(o.amountFen * (1 + p.supplierCostChangePct / 100))
+    })),
+    extraInflows: spec.extraInflows?.map((f) => ({
+      ...f,
+      dayOffset: f.dayOffset + p.settlementDelayDays,
+      amountFen: Math.round(f.amountFen * salesFactor)
     }))
   };
   return cashForecast(scaled);

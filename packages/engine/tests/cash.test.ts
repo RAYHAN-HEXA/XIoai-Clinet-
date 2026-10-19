@@ -150,3 +150,24 @@ describe('applyScenario — clamping and transforms', () => {
     expect(r.days[11]?.outflowFen).toBe(80_000 + 5_500_000);
   });
 });
+
+describe('applyScenario — scheduled receipts are stress-scaled (settlements of sales)', () => {
+  const spec = () => ({
+    ...base(),
+    dailySalesFen: 0, // isolate the extraInflow effect
+    adSpendPerDayFen: 0,
+    supplierObligations: [],
+    extraInflows: [{ id: 'set1', label: 'Pending settlement', dayOffset: 10, amountFen: 1_000_000 }]
+  });
+
+  it('shrinks scheduled receipts with the sales change', () => {
+    const r = applyScenario(spec(), { salesChangePct: -20 });
+    expect(r.days[9]?.inflowFen).toBe(800_000);
+  });
+
+  it('shifts scheduled receipts out with the payout delay', () => {
+    const r = applyScenario(spec(), { settlementDelayDays: 3 });
+    expect(r.days[9]?.inflowFen).toBe(0);
+    expect(r.days[12]?.inflowFen).toBe(1_000_000);
+  });
+});
