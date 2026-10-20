@@ -9,6 +9,7 @@ import { generalLimiter } from './middleware/rate-limit';
 import { csrfProtection } from './middleware/csrf';
 import { healthRouter } from './routes/health';
 import { authRouter } from './routes/auth';
+import { demoRouter } from './routes/demo';
 import { profitRouter } from './routes/profit';
 import { cashRouter } from './routes/cash';
 import { financingRouter } from './routes/financing';
@@ -19,6 +20,7 @@ import { auditRouter } from './routes/audit';
 import { sourcesRouter } from './routes/sources';
 import { importsRouter } from './routes/imports';
 import { assistantRouter } from './routes/assistant';
+import { dashboardRouter } from './routes/dashboard';
 import { errorHandler, notFoundHandler } from './middleware/error';
 
 export function createApp(): express.Express {
@@ -50,6 +52,7 @@ export function createApp(): express.Express {
 
   app.use(healthRouter);
   app.use('/api/auth', authRouter);
+  app.use('/api/auth/demo', demoRouter);
   app.use(csrfProtection);
   app.use('/api/profit', profitRouter);
   app.use('/api/cash', cashRouter);
@@ -62,6 +65,7 @@ export function createApp(): express.Express {
   app.use('/api/sources', sourcesRouter);
   app.use('/api/imports', importsRouter);
   app.use('/api/assistant', assistantRouter);
+  app.use('/api/dashboard', dashboardRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

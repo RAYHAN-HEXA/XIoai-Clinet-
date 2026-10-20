@@ -2,53 +2,55 @@
 
 Status legend: ✅ verified complete · 🟢 implemented, verification pending · 🟡 partial · ❌ missing
 
-Updated: 2026-10-19 (Phase Zero baseline — refresh at each phase completion)
+Updated: 2026-10-20 (post build-out + verification pass)
 
 ## Backend / data
 
 | Feature | Status | Notes |
 |---|---|---|
-| Register (Business + OWNER atomic) | ✅ | transaction, 409/400 paths tested |
-| Login / logout / me | ✅ | E2E on Neon + embedded PG |
-| JWT httpOnly session cookie | ✅ | HS256, 7d |
-| Login rate limit (10 fails/15min) | ✅ | 429 verified |
-| Server-side session revocation | ❌ → planned Phase 7 step |
-| CSRF double-submit | ❌ → planned |
-| Roles OWNER/ACCOUNTANT/VIEWER enforced per-endpoint | 🟡 | middleware exists, no endpoint uses it yet |
-| 13-model schema, money in fen, indexes | ✅ | migration 0_init on Neon |
-| Audit log (append-only, login events) | 🟡 | DATA_ACCESS + hash chain pending |
+| Register (Business + OWNER atomic) | ✅ | integration tests: 201/400/409/mismatch; confirmation-password server-validated |
+| Login / logout / me | ✅ | E2E + integration; session revoked server-side on logout |
+| JWT httpOnly session cookie | ✅ | HS256, 7d, jti-bound to a Session row |
+| Login rate limit (10 fails/15min) | ✅ | 429 verified in integration |
+| Server-side session revocation | ✅ | Session row + requireAuth re-checks jti |
+| CSRF double-submit | ✅ | integration test: 403 without header, allowed with |
+| Roles OWNER/ACCOUNTANT/VIEWER enforced per-endpoint | ✅ | roles-isolation.test.ts: VIEWER cannot mutate/import/audit |
+| 13-model schema, money in fen, indexes | ✅ | migrations `0_init`, `1_sessions_audit_chain` |
+| Audit log (append-only + hash chain) | ✅ | integrity endpoint + E2E "Hash chain verified" |
 | /health with DB check | ✅ | 200/503 |
 | Neon-over-443 driver (auto) | ✅ | verified live |
-| Engine `@xiaocai/engine` | ❌ | Phase 2 |
-| `getAuthorisedData(businessId)` | ❌ | Phase 3 |
-| Seed (Ms. Li, GMV ¥180k, 600 orders) | ❌ | Phase 3 |
-| CSV import (orders/settlements/ads/invoices) | ❌ | Phase 3 |
-| Sources grant/revoke API | ❌ | Phase 3 |
-| Profit/cash/financing/evidence/brief APIs | ❌ | Phase 4 |
-| Recommendations + approvals API | ❌ | Phase 4 |
-| Audit API + CSV export | ❌ | Phase 4 |
-| AI parseWhatIf / explain with number guard | ❌ | Phase 5 |
+| Engine `@xiaocai/engine` | ✅ | 90 unit tests; ¥100k→¥5k + Day-12 anchors |
+| `getAuthorisedData(businessId)` | ✅ | revoked sources excluded (integration tested) |
+| Seed (Ms. Li, GMV ¥180k, ~600 orders) | ✅ | deterministic, isDemo=true, repeatable |
+| CSV import (orders/settlements/ads/invoices) | ✅ | preview/confirm/templates/history, row errors, dedupe, formula-injection safe |
+| Sources grant/revoke API | ✅ | audited, business-scoped |
+| Profit/cash/financing/evidence/brief APIs | ✅ | Zod-validated, paginated, role-gated |
+| Recommendations + approvals API | ✅ | OWNER-only decision, duplicate-decision 409 |
+| Audit API + CSV export | ✅ | formula-injection-sanitized export |
+| AI parseWhatIf / explain with number guard | ✅ | `tests/ai-guard.test.ts` proves fabricated values are discarded |
 
 ## Frontend
 
 | Feature | Status | Notes |
 |---|---|---|
-| Landing / login / register | ✅ | |
-| Dashboard (shell + API chip) | 🟡 | KPI placeholders honest; real data pending Phase 6 |
-| Sidebar 10 destinations | 🟡 | 1 real, 9 stubs |
-| EN/中文 i18n | ✅ | cookie locale, all existing strings translated |
+| Landing / login / register | ✅ | demo CTA, safe `?next=`, confirm-password + strength meter |
+| Dashboard | ✅ | real API data, insights, alerts, freshness, demo banner, empty states |
+| Sidebar 10 destinations | ✅ | all real screens |
+| EN/中文 i18n | ✅ | cookie locale; check-i18n guard (392 keys × 2) |
 | Route guard middleware | ✅ | |
-| True Profit / Drivers / Simulator / Financing / Brief / Approvals / Sources / Audit / Security screens | ❌ | Phase 6 |
-| EvidenceNumber drill-down | ❌ | Phase 6 |
-| Mobile drawer ≤360px | ❌ | Phase 6 |
+| True Profit / Drivers / Simulator / Financing / Brief / Approvals / Sources / Audit / Security screens | ✅ | connected to real APIs |
+| EvidenceNumber drill-down | ✅ | evidence drawers on figures |
+| Mobile drawer ≤360px | ✅ | sidebar drawer + responsive tables/charts |
 
 ## Quality
 
 | Item | Status |
 |---|---|
-| Engine unit tests (≥40) | ❌ → Phase 2 |
-| API integration tests | 🟡 | 7 auth-utils unit tests only |
-| Playwright e2e | ❌ |
-| CI workflow | ❌ |
-| ¥100k→¥5k reproduced by tests | ❌ → Phase 2 |
-| Day-12 stressed shortage reproduced | ❌ → Phase 2 |
+| Engine unit tests | ✅ 90 tests (trueProfit/drivers/cash/financing/evidence/brief) |
+| API unit tests | ✅ 23 (jwt/password/csv/ai-guard) |
+| API integration tests | ✅ 26 (auth/roles/financials/imports/audit) |
+| Playwright e2e | ✅ Workflow A + B pass |
+| CI workflow | ✅ lint → typecheck → unit → integration → build |
+| ¥100k→¥5k reproduced by tests | ✅ |
+| Day-12 stressed shortage reproduced | ✅ (engine test + live demo API + E2E) |
+| Production build | ✅ `next build` 16 routes + engine tsc |

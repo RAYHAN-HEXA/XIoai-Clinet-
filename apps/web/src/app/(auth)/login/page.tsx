@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { api, ApiError } from '@/lib/api';
+import { safeNextPath } from '@/lib/safe-redirect';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -18,6 +19,7 @@ interface AuthResponse {
 export default function LoginPage() {
   const t = useTranslations('auth');
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -33,7 +35,7 @@ export default function LoginPage() {
         method: 'POST',
         body: JSON.stringify({ email, password })
       });
-      router.push('/dashboard');
+      router.push(safeNextPath(searchParams.get('next')));
       router.refresh();
     } catch (err) {
       setError(err instanceof ApiError && err.status === 401 ? t('invalidCredentials') : t('genericError'));

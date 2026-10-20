@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      # Prisma generate only needs a syntactically valid URL; no live DB is
+      # contacted by generate. Integration tests start their own embedded PG.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/xiaocai
+      JWT_SECRET: ci-secret-ci-secret-ci-secret-32chars-min
+      WEB_ORIGIN: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests (engine + API utils)
+        run: npm test
+
+      - name: Integration tests (embedded Postgres)
+        run: npm run test:integration
+
+      - name: Build
+        run: npm run build

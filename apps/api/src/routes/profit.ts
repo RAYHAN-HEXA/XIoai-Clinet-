@@ -60,12 +60,19 @@ profitRouter.get(
     const user = req.user!;
     const now = new Date();
     const current = range(req, now);
-    // previous period = same length immediately before `from`
+    // previous period defaults to the same length immediately before `from`;
+    // callers may pin both windows explicitly (prevFrom/prevTo) for a
+    // like-for-like comparison of two chosen reporting periods.
     const spanMs = current.to.getTime() - current.from.getTime();
-    const previous = {
-      from: new Date(current.from.getTime() - spanMs - 86_400_000),
-      to: new Date(current.from.getTime() - 86_400_000)
-    };
+    const previous = req.query['prevFrom'] || req.query['prevTo']
+      ? {
+          from: req.query['prevFrom'] ? new Date(String(req.query['prevFrom'])) : new Date(current.from.getTime() - spanMs - 86_400_000),
+          to: req.query['prevTo'] ? new Date(String(req.query['prevTo'])) : new Date(current.from.getTime() - 86_400_000)
+        }
+      : {
+          from: new Date(current.from.getTime() - spanMs - 86_400_000),
+          to: new Date(current.from.getTime() - 86_400_000)
+        };
     const [cur, prev] = await Promise.all([
       getAuthorisedData(user.businessId, current),
       getAuthorisedData(user.businessId, previous)

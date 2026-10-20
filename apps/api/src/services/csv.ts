@@ -21,49 +21,102 @@ export function yuanToFen(raw: string): number {
   return Math.round(parseFloat(t) * 100);
 }
 
-function dateField(raw: unknown): Date {
+/** Never throws — returns null when the value is not a parseable date. */
+function parseDateOrNull(raw: unknown): Date | null {
   const s = String(raw ?? '').trim();
+  if (s === '') return null;
   const d = new Date(s.length <= 10 ? `${s}T00:00:00Z` : s);
-  if (Number.isNaN(d.getTime())) throw new Error(`not a valid date: "${raw}"`);
-  return d;
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
-function moneyFromYuan(raw: unknown): number {
-  return yuanToFen(String(raw ?? ''));
+/** Never throws — returns null when the value is not a valid yuan amount. */
+function parseYuanToFenOrNull(raw: unknown): number | null {
+  const t = String(raw ?? '').trim().replace(/[¥,\s]/g, '');
+  if (t === '') return null;
+  if (!/^-?\d+(\.\d{1,2})?$/.test(t)) return null;
+  return Math.round(parseFloat(t) * 100);
 }
+
+const isEmpty = (v: unknown): boolean => v === '' || v == null;
+
+/**
+ * Zod columns built with superRefine+transform (NOT preprocess): preprocess
+ * lets a thrown error escape safeParse as a 500; superRefine records a row
+ * error instead, which is what the import pipeline needs.
+ */
+const dateColumn = z
+  .unknown()
+  .superRefine((v, ctx) => {
+    if (parseDateOrNull(v) === null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: `not a valid date: "${String(v)}"` });
+    }
+  })
+  .transform((v) => parseDateOrNull(v) as Date);
+
+const optionalDateColumn = z
+  .unknown()
+  .superRefine((v, ctx) => {
+    if (isEmpty(v)) return;
+    if (parseDateOrNull(v) === null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: `not a valid date: "${String(v)}"` });
+    }
+  })
+  .transform((v) => (isEmpty(v) ? undefined : parseDateOrNull(v)));
+
+function moneyColumn(defaultWhenEmpty: number): z.ZodType<number, z.ZodTypeDef, unknown> {
+  return z
+    .unknown()
+    .superRefine((v, ctx) => {
+      if (isEmpty(v)) return;
+      if (parseYuanToFenOrNull(v) === null) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `not a valid amount: "${String(v)}"` });
+      }
+    })
+    .transform((v) => (isEmpty(v) ? defaultWhenEmpty : (parseYuanToFenOrNull(v) as number)));
+}
+
+const optionalMoneyColumn = z
+  .unknown()
+  .superRefine((v, ctx) => {
+    if (isEmpty(v)) return;
+    if (parseYuanToFenOrNull(v) === null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: `not a valid amount: "${String(v)}"` });
+    }
+  })
+  .transform((v) => (isEmpty(v) ? undefined : (parseYuanToFenOrNull(v) as number)));
 
 export const rowSchemas: Record<ImportKind, z.ZodObject<z.ZodRawShape>> = {
   orders: z.object({
     channel: z.string().trim().min(1).max(40),
     externalId: z.string().trim().min(1).max(64),
-    orderedAt: z.preprocess(dateField, z.date()),
-    grossAmount: z.preprocess(moneyFromYuan, z.number().int().min(0)),
-    platformFee: z.preprocess((v) => (v === '' || v == null ? 0 : moneyFromYuan(v)), z.number().int().min(0)).default(0),
-    commission: z.preprocess((v) => (v === '' || v == null ? 0 : moneyFromYuan(v)), z.number().int().min(0)).default(0),
-    deliveryCost: z.preprocess((v) => (v === '' || v == null ? 0 : moneyFromYuan(v)), z.number().int().min(0)).default(0),
-    refundAmount: z.preprocess((v) => (v === '' || v == null ? 0 : moneyFromYuan(v)), z.number().int().min(0)).default(0),
+    orderedAt: dateColumn,
+    grossAmount: moneyColumn(0),
+    platformFee: moneyColumn(0),
+    commission: moneyColumn(0),
+    deliveryCost: moneyColumn(0),
+    refundAmount: moneyColumn(0),
     status: z.enum(['PENDING', 'COMPLETED', 'REFUNDED', 'CANCELLED']).default('COMPLETED'),
     productSku: z.string().trim().max(64).optional(),
-    settlementDate: z.preprocess((v) => (v === '' || v == null ? undefined : dateField(v)), z.date().optional()),
-    settledAmount: z.preprocess((v) => (v === '' || v == null ? undefined : moneyFromYuan(v)), z.number().int().min(0).optional())
+    settlementDate: optionalDateColumn,
+    settledAmount: optionalMoneyColumn
   }),
   settlements: z.object({
     channel: z.string().trim().min(1).max(40),
-    expectedDate: z.preprocess(dateField, z.date()),
-    amount: z.preprocess(moneyFromYuan, z.number().int().min(0)),
+    expectedDate: dateColumn,
+    amount: moneyColumn(0),
     status: z.enum(['PENDING', 'RECEIVED']).default('PENDING')
   }),
   ads: z.object({
     channel: z.string().trim().min(1).max(40),
     campaign: z.string().trim().min(1).max(120),
-    date: z.preprocess(dateField, z.date()),
-    spend: z.preprocess(moneyFromYuan, z.number().int().min(0)),
-    attributedRevenue: z.preprocess((v) => (v === '' || v == null ? 0 : moneyFromYuan(v)), z.number().int().min(0)).default(0)
+    date: dateColumn,
+    spend: moneyColumn(0),
+    attributedRevenue: moneyColumn(0)
   }),
   invoices: z.object({
     supplierName: z.string().trim().min(1).max(120),
-    amount: z.preprocess(moneyFromYuan, z.number().int().min(0)),
-    dueDate: z.preprocess(dateField, z.date()),
+    amount: moneyColumn(0),
+    dueDate: dateColumn,
     status: z.enum(['PAID', 'DUE', 'OVERDUE', 'MISSING_DOC']).default('DUE'),
     documentRef: z.string().trim().max(120).optional()
   })

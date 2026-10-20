@@ -1,0 +1,1062 @@
+openapi: 3.1.0
+info:
+  title: XiaoCai AI API
+  version: 0.1.0
+  description: |
+    Deterministic finance API for XiaoCai AI. All money values are integer **fen**
+    (¥1 = 100 fen). Every number the API returns is produced by
+    `@xiaocai/engine`; the optional LLM layer only parses questions and writes
+    prose. The API is fully functional with the LLM disabled.
+
+    **Auth:** httpOnly `xc_session` JWT cookie (HS256, 7 days, server-side
+    revocable via a `Session` row). Mutating requests must also send the
+    `x-csrf-token` header with the value of the `xc_csrf` cookie (double-submit).
+    `GET /api/auth/csrf` issues both cookies before login.
+
+    **Roles:** `OWNER` (all actions, including approvals), `ACCOUNTANT`
+    (imports, audit, recommendations — no approval decisions), `VIEWER`
+    (read-only financials; no audit, imports or mutations).
+
+    **Errors:** `{ "error": "CODE", "message": "..." }`.
+servers:
+  - url: http://localhost:4000
+    description: Local development
+tags:
+  - name: Health
+  - name: Auth
+  - name: Demo
+  - name: Dashboard
+  - name: Profit
+  - name: Cash
+  - name: Financing
+  - name: Evidence
+  - name: Brief
+  - name: Recommendations
+  - name: Approvals
+  - name: Audit
+  - name: Sources
+  - name: Imports
+  - name: Assistant
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: xc_session
+    csrfCookie:
+      type: apiKey
+      in: cookie
+      name: xc_csrf
+  parameters:
+    FromQuery:
+      name: from
+      in: query
+      schema: { type: string, format: date-time }
+      description: Inclusive start. Defaults to 30 days before `to`/now.
+    ToQuery:
+      name: to
+      in: query
+      schema: { type: string, format: date-time }
+      description: Inclusive end. Defaults to now.
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, example: VALIDATION }
+        message: { type: string }
+        issues:
+          type: array
+          items: { type: object, additionalProperties: true }
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+        name: { type: string }
+        role: { type: string, enum: [OWNER, ACCOUNTANT, VIEWER] }
+        businessId: { type: string }
+    Business:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        nameZh: { type: string, nullable: true }
+        currency: { type: string, example: CNY }
+        openingCash: { type: integer, description: fen }
+        isDemo: { type: boolean }
+    ScenarioParams:
+      type: object
+      required: [salesChangePct, supplierCostChangePct, settlementDelayDays, adSpendChangePct]
+      properties:
+        salesChangePct: { type: number, minimum: -95, maximum: 500 }
+        supplierCostChangePct: { type: number, minimum: -95, maximum: 500 }
+        settlementDelayDays: { type: number, minimum: -30, maximum: 120 }
+        adSpendChangePct: { type: number, minimum: -95, maximum: 500 }
+    CashForecast:
+      type: object
+      properties:
+        openingCashFen: { type: integer }
+        firstShortageDay: { type: integer, nullable: true }
+        firstShortageDateISO: { type: string, nullable: true }
+        minBalanceFen: { type: integer }
+        minBalanceDay: { type: integer }
+        closingBalanceFen: { type: integer }
+        alertLevel: { type: string, enum: [OK, WATCH, CRITICAL] }
+        alertExplanation: { type: string }
+        obligationsAtShortage: { type: array, items: { type: object } }
+        completeness: { type: object, additionalProperties: true }
+        days: { type: array, items: { type: object } }
+    TrueProfitSummary:
+      type: object
+      properties:
+        revenue: { type: integer }
+        realProfit: { type: integer }
+        marginPct: { type: number, nullable: true }
+        components: { type: object, additionalProperties: true }
+        meta: { type: object, additionalProperties: true }
+    Recommendation:
+      type: object
+      description: Evidence · Impact · Action. Approving records a decision only — it never executes a payment or message.
+      properties:
+        id: { type: string }
+        businessId: { type: string }
+        type: { type: string }
+        title: { type: string }
+        evidence: { type: array, items: { type: object } }
+        impact: { type: object }
+        action: { type: object }
+        createdAt: { type: string, format: date-time }
+    Approval:
+      type: object
+      properties:
+        id: { type: string }
+        recommendationId: { type: string }
+        status: { type: string, enum: [PENDING, APPROVED, REJECTED] }
+        decidedById: { type: string, nullable: true }
+        decidedAt: { type: string, format: date-time, nullable: true }
+        note: { type: string }
+    DataSource:
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string }
+        name: { type: string }
+        platform: { type: string, nullable: true }
+        status: { type: string, enum: [GRANTED, REVOKED] }
+        permission: { type: string, enum: [READ_ONLY, READ_WRITE] }
+        grantedAt: { type: string, format: date-time }
+        revokedAt: { type: string, format: date-time, nullable: true }
+  responses:
+    Unauthenticated:
+      description: Missing, expired or revoked session
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Authenticated but the role cannot perform this action
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Not found in this business (no cross-tenant leakage)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Validation:
+      description: Zod validation failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+security:
+  - sessionCookie: []
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      security: []
+      summary: Liveness + database check
+      responses:
+        '200':
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  db: { type: boolean }
+        '503':
+          description: Database unreachable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: degraded }
+                  db: { type: boolean, example: false }
+
+  /api/auth/csrf:
+    get:
+      tags: [Auth]
+      summary: Issue CSRF token (+ session cookie if absent)
+      responses:
+        '200':
+          description: Token issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Create a Business and its OWNER atomically
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, name, businessName]
+              properties:
+                email: { type: string, format: email }
+                password:
+                  type: string
+                  minLength: 8
+                  description: At least one letter and one digit
+                name: { type: string, maxLength: 80 }
+                businessName: { type: string, maxLength: 120 }
+                businessNameZh: { type: string, maxLength: 120 }
+      responses:
+        '201':
+          description: Registered and signed in
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+                  business: { $ref: '#/components/schemas/Business' }
+        '400': { $ref: '#/components/responses/Validation' }
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Sign in (10 attempts / 15 min per IP; 5 failures locks the account for 15 min)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: Signed in
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+                  business: { $ref: '#/components/schemas/Business' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '429':
+          description: Rate limited or account temporarily locked
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke the server-side session and clear the cookie
+      responses:
+        '204': { description: Logged out }
+
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: Current user and business
+      responses:
+        '200':
+          description: Current session
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+                  business: { $ref: '#/components/schemas/Business' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /api/auth/events:
+    get:
+      tags: [Auth]
+      summary: Last 20 authentication/session events for this business
+      responses:
+        '200':
+          description: Security events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        action: { type: string }
+                        entityType: { type: string }
+                        ip: { type: string, nullable: true }
+                        createdAt: { type: string, format: date-time }
+
+  /api/auth/demo:
+    post:
+      tags: [Demo]
+      security: []
+      summary: Start an isolated Ms. Li demo session
+      description: Clones the canonical demo business into a private business and signs the visitor in. Clones are purged after 24 hours.
+      responses:
+        '201':
+          description: Demo session created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+                  business: { $ref: '#/components/schemas/Business' }
+                  demo: { type: boolean }
+        '503':
+          description: Demo dataset not seeded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: Too many demo sessions from this IP
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/dashboard/summary:
+    get:
+      tags: [Dashboard]
+      summary: Composed dashboard read (30-day profit, cash, counts, insights)
+      responses:
+        '200':
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  business: { $ref: '#/components/schemas/Business' }
+                  range:
+                    type: object
+                    properties:
+                      from: { type: string, format: date-time }
+                      to: { type: string, format: date-time }
+                  revenue: { type: integer }
+                  realProfit: { type: integer }
+                  marginPct: { type: number, nullable: true }
+                  gmv30Fen: { type: integer }
+                  settledFen: { type: integer }
+                  obligationsFen: { type: integer }
+                  cash: { $ref: '#/components/schemas/CashForecast' }
+                  counts:
+                    type: object
+                    properties:
+                      pendingApprovals: { type: integer }
+                      missingDocs: { type: integer }
+                      sourcesGranted: { type: integer }
+                      sourcesRevoked: { type: integer }
+                      ordersIncluded: { type: integer }
+                  insights:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        severity: { type: string, enum: [info, warning, critical, positive] }
+                        title: { type: object, additionalProperties: { type: string } }
+                        detail: { type: object, additionalProperties: { type: string } }
+                  recentImports: { type: array, items: { type: object } }
+                  freshness: { type: object, additionalProperties: true }
+                  revokedSourceCount: { type: integer }
+
+  /api/profit/summary:
+    get:
+      tags: [Profit]
+      summary: True profit for a period
+      parameters:
+        - $ref: '#/components/parameters/FromQuery'
+        - $ref: '#/components/parameters/ToQuery'
+      responses:
+        '200':
+          description: Profit summary
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - type: object
+                    properties:
+                      range:
+                        type: object
+                        properties:
+                          from: { type: string, format: date-time }
+                          to: { type: string, format: date-time }
+                  - $ref: '#/components/schemas/TrueProfitSummary'
+
+  /api/profit/by-product:
+    get:
+      tags: [Profit]
+      summary: True profit grouped by product
+      parameters:
+        - $ref: '#/components/parameters/FromQuery'
+        - $ref: '#/components/parameters/ToQuery'
+      responses:
+        '200':
+          description: Grouped profit
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  range: { type: object }
+                  groups: { type: array, items: { type: object } }
+                  meta: { type: object }
+
+  /api/profit/by-campaign:
+    get:
+      tags: [Profit]
+      summary: True profit grouped by ad campaign
+      parameters:
+        - $ref: '#/components/parameters/FromQuery'
+        - $ref: '#/components/parameters/ToQuery'
+      responses:
+        '200': { description: Grouped profit, content: { application/json: { schema: { type: object } } } }
+
+  /api/profit/by-channel:
+    get:
+      tags: [Profit]
+      summary: True profit grouped by sales channel
+      parameters:
+        - $ref: '#/components/parameters/FromQuery'
+        - $ref: '#/components/parameters/ToQuery'
+      responses:
+        '200': { description: Grouped profit, content: { application/json: { schema: { type: object } } } }
+
+  /api/profit/drivers:
+    get:
+      tags: [Profit]
+      summary: Reconciling profit-change drivers vs a previous period
+      parameters:
+        - $ref: '#/components/parameters/FromQuery'
+        - $ref: '#/components/parameters/ToQuery'
+        - name: prevFrom
+          in: query
+          schema: { type: string, format: date-time }
+        - name: prevTo
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Drivers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current: { type: object }
+                  previous: { type: object }
+                  profitChangeFen: { type: integer }
+                  profitChangePct: { type: number, nullable: true }
+                  drivers: { type: array, items: { type: object } }
+                  reconciles: { type: boolean }
+
+  /api/cash/forecast:
+    get:
+      tags: [Cash]
+      summary: 30-day base + stressed cash forecast
+      responses:
+        '200':
+          description: Forecast
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  spec: { type: object }
+                  base: { $ref: '#/components/schemas/CashForecast' }
+                  stressed: { $ref: '#/components/schemas/CashForecast' }
+                  stressParams: { $ref: '#/components/schemas/ScenarioParams' }
+
+  /api/cash/preview:
+    post:
+      tags: [Cash]
+      summary: Recompute a scenario live (nothing persisted)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 80 }
+                params: { $ref: '#/components/schemas/ScenarioParams' }
+      responses:
+        '200':
+          description: Base and scenario result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  base: { $ref: '#/components/schemas/CashForecast' }
+                  result: { $ref: '#/components/schemas/CashForecast' }
+
+  /api/cash/scenario:
+    post:
+      tags: [Cash]
+      summary: Compute and persist a scenario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 80 }
+                params: { $ref: '#/components/schemas/ScenarioParams' }
+      responses:
+        '201':
+          description: Scenario saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scenario: { type: object }
+                  result: { $ref: '#/components/schemas/CashForecast' }
+        '400': { $ref: '#/components/responses/Validation' }
+
+  /api/cash/scenarios:
+    get:
+      tags: [Cash]
+      summary: Saved scenarios (latest 50)
+      responses:
+        '200':
+          description: Scenarios
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scenarios: { type: array, items: { type: object } }
+
+  /api/cash/alerts:
+    get:
+      tags: [Cash]
+      summary: Base-forecast alert summary
+      responses:
+        '200':
+          description: Alert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  alertLevel: { type: string, enum: [OK, WATCH, CRITICAL] }
+                  firstShortageDay: { type: integer, nullable: true }
+                  firstShortageDateISO: { type: string, nullable: true }
+                  minBalanceFen: { type: integer }
+                  explanation: { type: string }
+                  obligationsAtShortage: { type: array, items: { type: object } }
+                  completeness: { type: object }
+
+  /api/financing/options:
+    get:
+      tags: [Financing]
+      summary: Qualitative financing options matched to the projected gap
+      description: Returns educational options and a disclaimer; it never applies for credit.
+      parameters:
+        - name: scenarioId
+          in: query
+          schema: { type: string }
+          description: Optionally drive the gap from a saved scenario
+      responses:
+        '200':
+          description: Options
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  gap:
+                    type: object
+                    properties:
+                      gapAmountFen: { type: integer, nullable: true }
+                      firstShortageDay: { type: integer, nullable: true }
+                  reason: { type: string, enum: [PAYOUT_DELAYED, SHORT_GAP, PLANNED_EXPANSION] }
+                  scenario: { type: object, nullable: true }
+                  ranked: { type: array, items: { type: object } }
+                  disclaimer: { type: string }
+
+  /api/evidence/{metric}:
+    get:
+      tags: [Evidence]
+      summary: Drill-down evidence tree for one metric
+      parameters:
+        - name: metric
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [revenue, realProfit, productCost, advertising, influencerCommission, delivery, refunds, platformFees]
+        - $ref: '#/components/parameters/FromQuery'
+        - $ref: '#/components/parameters/ToQuery'
+      responses:
+        '200':
+          description: Evidence tree
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  from: { type: string, format: date-time }
+                  to: { type: string, format: date-time }
+                  metric: { type: string }
+                  valueFen: { type: integer }
+                  nodes: { type: array, items: { type: object } }
+                  sources: { type: array, items: { type: object } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/brief/daily:
+    get:
+      tags: [Brief]
+      summary: Daily owner brief (localized templates, engine numbers)
+      parameters:
+        - name: lang
+          in: query
+          schema: { type: string, enum: [en, zh], default: en }
+      responses:
+        '200':
+          description: Brief
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lang: { type: string, enum: [en, zh] }
+                  isDemo: { type: boolean }
+                  brief: { type: object }
+
+  /api/recommendations:
+    get:
+      tags: [Recommendations]
+      summary: List recommendations with approval state
+      responses:
+        '200':
+          description: Recommendations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recommendations: { type: array, items: { $ref: '#/components/schemas/Recommendation' } }
+    post:
+      tags: [Recommendations]
+      summary: Create a recommendation and a PENDING approval (OWNER/ACCOUNTANT)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, title, evidence, impact, action]
+              properties:
+                type: { type: string, maxLength: 60 }
+                title: { type: string, maxLength: 160 }
+                evidence: { type: array, minItems: 1, items: { type: object } }
+                impact: { type: object }
+                action: { type: object }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recommendation: { $ref: '#/components/schemas/Recommendation' }
+                  approval: { $ref: '#/components/schemas/Approval' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/approvals:
+    get:
+      tags: [Approvals]
+      summary: List approvals (pending first)
+      responses:
+        '200':
+          description: Approvals
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  approvals: { type: array, items: { $ref: '#/components/schemas/Approval' } }
+                  principle: { type: string }
+
+  /api/approvals/{id}/decision:
+    post:
+      tags: [Approvals]
+      summary: Record an OWNER decision (does not execute anything)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [APPROVED, REJECTED] }
+                note: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Decision recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  approval: { $ref: '#/components/schemas/Approval' }
+                  decisionRecorded: { type: boolean }
+                  executesNothing: { type: boolean }
+                  nextStepsForOwner: { type: array, items: { type: string } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Already decided
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/audit:
+    get:
+      tags: [Audit]
+      summary: Paginated audit log (OWNER/ACCOUNTANT)
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: action
+          in: query
+          schema: { type: string }
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Audit page
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rows: { type: array, items: { type: object } }
+                  total: { type: integer }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/audit/integrity:
+    get:
+      tags: [Audit]
+      summary: Verify the audit hash chain
+      responses:
+        '200':
+          description: Chain status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid: { type: boolean }
+                  brokenAtId: { type: string, nullable: true }
+                  rows: { type: integer }
+
+  /api/audit/export.csv:
+    get:
+      tags: [Audit]
+      summary: Export audit log as formula-injection-safe CSV
+      responses:
+        '200':
+          description: CSV file
+          content:
+            text/csv:
+              schema: { type: string }
+
+  /api/sources:
+    get:
+      tags: [Sources]
+      summary: List authorized data sources with linked row counts
+      responses:
+        '200':
+          description: Sources
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sources:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/DataSource'
+                        - type: object
+                          properties:
+                            linkedOrders: { type: integer }
+                            linkedAds: { type: integer }
+
+  /api/sources/{id}/status:
+    post:
+      tags: [Sources]
+      summary: Grant or revoke a source (OWNER only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [GRANTED, REVOKED] }
+      responses:
+        '200':
+          description: Updated source
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  source: { $ref: '#/components/schemas/DataSource' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/sources/{id}/permission:
+    post:
+      tags: [Sources]
+      summary: Change a source permission tier (OWNER only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [permission]
+              properties:
+                permission: { type: string, enum: [READ_ONLY, READ_WRITE] }
+      responses:
+        '200':
+          description: Updated source
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  source: { $ref: '#/components/schemas/DataSource' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/imports/{kind}/preview:
+    post:
+      tags: [Imports]
+      summary: Parse, auto-map and validate a CSV without committing (OWNER/ACCOUNTANT)
+      parameters:
+        - name: kind
+          in: path
+          required: true
+          schema: { type: string, enum: [orders, settlements, ads, invoices] }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200':
+          description: Preview result; row errors are reported, nothing is written
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  kind: { type: string }
+                  filename: { type: string }
+                  detectedHeaders: { type: array, items: { type: string } }
+                  suggestedMapping: { type: object, additionalProperties: { type: string } }
+                  missingRequiredColumns: { type: array, items: { type: string } }
+                  totalRows: { type: integer }
+                  validRows: { type: integer }
+                  errorRows: { type: integer }
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        rowNumber: { type: integer }
+                        errors: { type: array, items: { type: string } }
+                  sample: { type: array, items: { type: object } }
+        '400': { $ref: '#/components/responses/Validation' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '413':
+          description: More than 5,000 rows
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/imports/{kind}:
+    post:
+      tags: [Imports]
+      summary: Re-validate with the confirmed mapping and insert; dedupes orders (OWNER/ACCOUNTANT)
+      parameters:
+        - name: kind
+          in: path
+          required: true
+          schema: { type: string, enum: [orders, settlements, ads, invoices] }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                mapping:
+                  type: string
+                  description: JSON object mapping template field → CSV header
+      responses:
+        '200':
+          description: Import completed (possibly with row errors/duplicates)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job: { type: object }
+                  inserted: { type: integer }
+                  duplicates: { type: integer }
+                  failedRows: { type: integer }
+                  errors: { type: array, items: { type: object } }
+        '400': { $ref: '#/components/responses/Validation' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/imports/templates/{kind}:
+    get:
+      tags: [Imports]
+      summary: Download a CSV template
+      parameters:
+        - name: kind
+          in: path
+          required: true
+          schema: { type: string, enum: [orders, settlements, ads, invoices] }
+      responses:
+        '200':
+          description: CSV template
+          content:
+            text/csv:
+              schema: { type: string }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/imports:
+    get:
+      tags: [Imports]
+      summary: Import history (latest 50) (OWNER/ACCOUNTANT)
+      responses:
+        '200':
+          description: Import jobs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobs: { type: array, items: { type: object } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/assistant/ask:
+    post:
+      tags: [Assistant]
+      summary: Natural-language what-if (LLM optional, numbers always from the engine)
+      description: |
+        The LLM only extracts scenario parameters from the question and explains
+        the engine result. A number guard rejects any explanation containing a
+        figure not present in the engine payload. With the LLM disabled or
+        unavailable, a templated response is returned.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [question]
+              properties:
+                question: { type: string, minLength: 1, maxLength: 500 }
+                lang: { type: string, enum: [en, zh], default: en }
+      responses:
+        '200':
+          description: Assistant answer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [OK, NEEDS_CLARIFICATION, LLM_UNAVAILABLE] }
+                  answer: { type: string }
+                  params: { $ref: '#/components/schemas/ScenarioParams' }
+                  confidence: { type: number }
+                  scenario: { type: object }
+                  answerSource: { type: string, example: guarded }
+                  options: { type: array, items: { type: object } }
+                  disclaimer: { type: string }

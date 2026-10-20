@@ -18,6 +18,7 @@
  * so re-running replaces the demo dataset safely. Real businesses are untouched.
  */
 import bcrypt from 'bcryptjs';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../src/lib/prisma';
 
 /** Deterministic PRNG (mulberry32) — same seed, same dataset. */
@@ -67,6 +68,22 @@ async function main(): Promise<void> {
       businessId: business.id
     }
   });
+
+  // Three role accounts on the same demo business, so each role can be shown
+  // end-to-end. Server-side authorization is what matters (requireRole); these
+  // rows only exist to log in as each role quickly.
+  const roleUsers = [
+    { email: DEMO_EMAIL, name: 'Ms. Li 李女士 · OWNER', role: 'OWNER' as const },
+    { email: 'accountant@demo.xiaocai.ai', name: 'Accountant 会计 · ACCOUNTANT', role: 'ACCOUNTANT' as const },
+    { email: 'viewer@demo.xiaocai.ai', name: 'Viewer 只读用户 · VIEWER', role: 'VIEWER' as const }
+  ];
+  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
+  for (const u of roleUsers) {
+    if (u.email === DEMO_EMAIL) continue; // already created above
+    await prisma.user.create({
+      data: { email: u.email, passwordHash, name: u.name, role: u.role, businessId: business.id }
+    });
+  }
 
   // ── data sources (all granted, read-only) ─────────────────────────────────
   const sourceDefs = [
@@ -272,6 +289,65 @@ async function main(): Promise<void> {
     });
   }
 
+  // ── recommendations + pending approvals (Evidence · Impact · Action) ──────
+  // Approval records the owner's decision — XiaoCai never executes anything.
+  const recommendationDefs = [
+    {
+      type: 'SETTLEMENT_ADVANCE',
+      title: 'Advance part of the pending Douyin settlement to cover the day-12 supplier payment',
+      evidence: [
+        { label: { en: 'Pending Douyin settlement (D15–D28)', zh: '抖音待结算款（D15–D28）' }, value: { en: '≈ ¥50,351 scheduled inside the forecast window', zh: '预测窗口内约 ¥50,351' } },
+        { label: { en: 'Supplier payment due day 12', zh: '第 12 天到期供应商付款' }, value: { en: '¥48,800 + ¥1,200 (missing document)', zh: '¥48,800 + ¥1,200（缺单据）' } },
+        { label: { en: 'Stressed forecast (sales −20%)', zh: '压力情景（销售 −20%）' }, value: { en: 'First shortage on day 12', zh: '第 12 天首次现金短缺' } }
+      ],
+      impact: {
+        headline: { en: 'Closes the stressed day-12 gap without delaying suppliers', zh: '补上压力情景下第 12 天的缺口，且不拖欠供应商' },
+        detail: { en: 'Advance fees are charged by the platform — confirm the exact fee before applying. XiaoCai does not submit anything.', zh: '提前回款手续费由平台收取——申请前请确认具体费用。小财不会代为提交任何申请。' }
+      },
+      action: {
+        headline: { en: 'Owner opens the platform seller center and applies for the advance personally', zh: '企业主自行打开平台商家中心申请回款提前' },
+        steps: [
+          { en: 'Check the advance fee and the exact amount offered.', zh: '确认提前手续费与可提前金额。' },
+          { en: 'Apply only for the amount that covers the day-12 payment.', zh: '仅申请覆盖第 12 天付款所需的金额。' },
+          { en: 'Re-run the Survival Simulator after the payout arrives.', zh: '到账后重新运行生存模拟器确认。' }
+        ]
+      }
+    },
+    {
+      type: 'EXTEND_SUPPLIER_TERMS',
+      title: 'Ask Yiwu Packaging B to move the ¥48,800 invoice 7 days later',
+      evidence: [
+        { label: { en: 'Invoice INV-2026-0123', zh: '发票 INV-2026-0123' }, value: { en: '¥48,800 due in 12 days', zh: '¥48,800，12 天后到期' } },
+        { label: { en: 'Payment history', zh: '历史付款记录' }, value: { en: 'No overdue payments to this supplier in the last 60 days', zh: '近 60 天对该供应商无逾期记录' } }
+      ],
+      impact: {
+        headline: { en: 'Lowest-cost option — usually no fee if the relationship is healthy', zh: '成本最低——关系良好时通常不产生费用' },
+        detail: { en: 'Uses goodwill; suppliers can decline. Have the settlement advance as plan B.', zh: '会消耗信任，供应商可能拒绝；请把回款提前作为备选方案。' }
+      },
+      action: {
+        headline: { en: 'Owner contacts the supplier and agrees a new date in writing', zh: '企业主联系供应商并书面确认新账期' },
+        steps: [
+          { en: 'Call the supplier before the due date, not after.', zh: '在到期日之前联系，而不是之后。' },
+          { en: 'Agree the new date in writing (message or email).', zh: '以书面形式（消息或邮件）确认新日期。' },
+          { en: 'Record the revised due date in your invoice ledger.', zh: '在发票台账中更新到期日。' }
+        ]
+      }
+    }
+  ];
+  for (const def of recommendationDefs) {
+    const rec = await prisma.recommendation.create({
+      data: {
+        businessId: business.id,
+        type: def.type,
+        title: def.title,
+        evidence: def.evidence as unknown as Prisma.InputJsonValue,
+        impact: def.impact as unknown as Prisma.InputJsonValue,
+        action: def.action as unknown as Prisma.InputJsonValue
+      }
+    });
+    await prisma.approval.create({ data: { recommendationId: rec.id, status: 'PENDING' } });
+  }
+
   const counts = {
     orders: await prisma.order.count({ where: { businessId: business.id } }),
     settlements: await prisma.settlement.count({ where: { businessId: business.id } }),
@@ -282,6 +358,7 @@ async function main(): Promise<void> {
   console.log('Demo seed complete — Ms. Li sandbox is ready.');
   console.log(`  business : ${business.name} (${business.id})  isDemo=true`);
   console.log(`  login    : ${DEMO_EMAIL} / ${DEMO_PASSWORD}`);
+  console.log(`  roles    : owner ${DEMO_EMAIL} · accountant accountant@demo.xiaocai.ai · viewer viewer@demo.xiaocai.ai  (pw ${DEMO_PASSWORD})`);
   console.log(`  rows     : ${JSON.stringify(counts)}`);
   console.log(`  GMV(30d) : ¥${(GMV30_TARGET / FEN).toLocaleString('en-US')} (normalized exactly) · settled target ¥${SETTLED_TARGET / FEN}`);
   console.log('  All demo data is illustrative — sandbox demo dataset.');

@@ -48,6 +48,21 @@ cashRouter.get(
   })
 );
 
+/** Slider-driven live recompute — same engine, nothing persisted. */
+cashRouter.post(
+  '/preview',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const user = req.user!;
+    const body = scenarioSchema.parse(req.body);
+    const spec = await buildBaseForecastSpec(user.businessId);
+    const base = cashForecast(spec);
+    const result = applyScenario(spec, body.params);
+    auditRead(user.businessId, user.id, req.ip, 'POST /api/cash/preview');
+    res.json({ base, result });
+  })
+);
+
 cashRouter.post(
   '/scenario',
   requireAuth,

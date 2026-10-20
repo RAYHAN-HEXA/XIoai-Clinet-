@@ -18,16 +18,14 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return;
   }
 
-  const row = await prisma.session.findUnique({ where: { id: session.jti } });
+  const [row, user] = await Promise.all([
+    prisma.session.findUnique({ where: { id: session.jti } }),
+    prisma.user.findUnique({ where: { id: session.userId }, include: { business: true } })
+  ]);
   if (!row || row.revokedAt !== null || row.expiresAt < new Date()) {
     res.status(401).json({ error: 'UNAUTHENTICATED', reason: 'SESSION_REVOKED_OR_EXPIRED' });
     return;
   }
-
-  const user = await prisma.user.findUnique({
-    where: { id: session.userId },
-    include: { business: true }
-  });
   if (!user) {
     res.status(401).json({ error: 'UNAUTHENTICATED' });
     return;

@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { api, ApiError } from '@/lib/api';
+import { safeNextPath } from '@/lib/safe-redirect';
+import { PasswordStrength } from '@/components/password-strength';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -18,19 +20,25 @@ interface AuthResponse {
 export default function RegisterPage() {
   const t = useTranslations('auth');
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [name, setName] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [businessNameZh, setBusinessNameZh] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setPending(true);
     setError(null);
+    if (password !== confirmPassword) {
+      setError(t('passwordMismatch'));
+      return;
+    }
+    setPending(true);
     try {
       await api<AuthResponse>('/api/auth/register', {
         method: 'POST',
@@ -39,10 +47,11 @@ export default function RegisterPage() {
           businessName,
           businessNameZh: businessNameZh || undefined,
           email,
-          password
+          password,
+          confirmPassword
         })
       });
-      router.push('/dashboard');
+      router.push(safeNextPath(searchParams.get('next')));
       router.refresh();
     } catch (err) {
       setError(err instanceof ApiError && err.status === 409 ? t('toLogin') : t('genericError'));
@@ -103,6 +112,23 @@ export default function RegisterPage() {
               minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              aria-describedby="password-hint"
+            />
+            <p id="password-hint" className="text-xs text-muted-foreground">
+              {t('passwordHint')}
+            </p>
+            <PasswordStrength value={password} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="confirmPassword">{t('confirmPassword')}</Label>
+            <Input
+              id="confirmPassword"
+              type="password"
+              autoComplete="new-password"
+              required
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              aria-invalid={confirmPassword.length > 0 && confirmPassword !== password ? true : undefined}
             />
           </div>
 

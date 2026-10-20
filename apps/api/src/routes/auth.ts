@@ -13,18 +13,24 @@ import { asyncHandler } from '../lib/async';
 
 export const authRouter = Router();
 
-const registerSchema = z.object({
-  email: z.string().email().max(254).toLowerCase(),
-  // policy: ≥8 chars, at least one letter and one digit (Phase-7 hardening)
-  password: z
-    .string()
-    .min(8, 'Password must be at least 8 characters')
-    .max(128)
-    .regex(/^(?=.*[A-Za-z])(?=.*\d).+$/, 'Password must contain at least one letter and one number'),
-  name: z.string().trim().min(1).max(80),
-  businessName: z.string().trim().min(1).max(120),
-  businessNameZh: z.string().trim().max(120).optional()
-});
+const registerSchema = z
+  .object({
+    email: z.string().email().max(254).toLowerCase(),
+    // policy: ≥8 chars, at least one letter and one digit (Phase-7 hardening)
+    password: z
+      .string()
+      .min(8, 'Password must be at least 8 characters')
+      .max(128)
+      .regex(/^(?=.*[A-Za-z])(?=.*\d).+$/, 'Password must contain at least one letter and one number'),
+    confirmPassword: z.string().optional(),
+    name: z.string().trim().min(1).max(80),
+    businessName: z.string().trim().min(1).max(120),
+    businessNameZh: z.string().trim().max(120).optional()
+  })
+  .refine((b) => b.confirmPassword === undefined || b.confirmPassword === b.password, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword']
+  });
 
 const loginSchema = z.object({
   email: z.string().email().toLowerCase(),
@@ -178,27 +184,38 @@ authRouter.post(
   })
 );
 
+/**
+ * Logout is idempotent: a stale cookie (re-seeded DB, purged demo clone,
+ * rotated secret) must still clear and land the browser on /login — otherwise
+ * the web middleware sees the lingering cookie and bounces /login → /dashboard
+ * forever. Revocation+audit stay best-effort; clearing the cookie is not.
+ */
 authRouter.post(
   '/logout',
-  requireAuth,
   asyncHandler(async (req, res) => {
     const token = req.cookies?.[SESSION_COOKIE];
     const session = token ? verifySession(token) : null;
 
     // server-side revocation — the JWT alone would still verify until expiry
     if (session) {
-      await prisma.session.updateMany({
-        where: { id: session.jti, userId: session.userId, revokedAt: null },
-        data: { revokedAt: new Date() }
+      const row = await prisma.session.findUnique({
+        where: { id: session.jti },
+        select: { revokedAt: true }
       });
-      writeAudit({
-        businessId: session.businessId,
-        userId: session.userId,
-        action: 'LOGOUT',
-        entityType: 'USER',
-        entityId: session.userId,
-        ip: req.ip
-      });
+      if (row && row.revokedAt === null) {
+        await prisma.session.updateMany({
+          where: { id: session.jti, userId: session.userId, revokedAt: null },
+          data: { revokedAt: new Date() }
+        });
+        writeAudit({
+          businessId: session.businessId,
+          userId: session.userId,
+          action: 'LOGOUT',
+          entityType: 'USER',
+          entityId: session.userId,
+          ip: req.ip
+        });
+      }
     }
 
     const { maxAge: _maxAge, ...clearOptions } = sessionCookieOptions();
@@ -216,3 +233,21 @@ authRouter.get('/me', requireAuth, (req, res) => {
   const { business, ...userOnly } = user;
   res.json({ user: toSafeUser(userOnly), business });
 });
+
+/**
+ * Recent security-relevant events for THIS business's security centre.
+ * A deliberately narrow, role-safe subset of the audit trail (authentication
+ * and session events only) — full audit history stays OWNER/ACCOUNTANT.
+ */
+const SECURITY_ACTIONS = ['LOGIN', 'LOGIN_FAILED', 'LOGOUT', 'DEMO_SESSION', 'REGISTER', 'SESSION_REVOKE'] as const;
+
+authRouter.get('/events', requireAuth, asyncHandler(async (req, res) => {
+  const user = req.user!;
+  const events = await prisma.auditLog.findMany({
+    where: { businessId: user.businessId, action: { in: [...SECURITY_ACTIONS] } },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: 20,
+    select: { id: true, action: true, entityType: true, ip: true, createdAt: true }
+  });
+  res.json({ events });
+}));

@@ -7,7 +7,18 @@ import { NextResponse, type NextRequest } from 'next/server';
  * and API calls will 401 as expected.
  */
 const SESSION_COOKIE = 'xc_session';
-const PROTECTED_PREFIXES = ['/dashboard'];
+const PROTECTED_PREFIXES = [
+  '/dashboard',
+  '/profit',
+  '/drivers',
+  '/simulator',
+  '/financing',
+  '/brief',
+  '/approvals',
+  '/sources',
+  '/audit',
+  '/security'
+];
 const AUTH_PAGES = ['/login', '/register'];
 
 export function middleware(req: NextRequest) {
@@ -28,5 +39,18 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/login', '/register']
+  matcher: [
+    '/dashboard/:path*',
+    '/profit/:path*',
+    '/drivers/:path*',
+    '/simulator/:path*',
+    '/financing/:path*',
+    '/brief/:path*',
+    '/approvals/:path*',
+    '/sources/:path*',
+    '/audit/:path*',
+    '/security/:path*',
+    '/login',
+    '/register'
+  ]
 };
