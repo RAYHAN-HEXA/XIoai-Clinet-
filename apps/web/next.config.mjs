@@ -14,7 +14,12 @@ const nextConfig = {
   async rewrites() {
     const target = process.env.API_PROXY_TARGET;
     if (!target) return [];
-    return [{ source: '/api/:path*', destination: `${target}/api/:path*` }];
+    return [
+      // The API health badge (ApiStatus) pings /health, not /api/health — proxy
+      // it alongside the API itself so the badge reports the real backend state.
+      { source: '/health', destination: `${target}/health` },
+      { source: '/api/:path*', destination: `${target}/api/:path*` }
+    ];
   }
 };
 
